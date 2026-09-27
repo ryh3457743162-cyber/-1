@@ -1,0 +1,10 @@
+{
+  "years": {
+    "2026": [
+      {"id": "fixture-1", "order": 1, "layout": "single", "photos": [{"photoId": "seed-01", "slot": 1}]},
+      {"id": "fixture-2", "order": 2, "layout": "three-hero-left", "photos": [{"photoId": "seed-01", "slot": 1}, {"photoId": "seed-02", "slot": 2}, {"photoId": "seed-03", "slot": 3}]},
+      {"id": "fixture-3", "order": 3, "layout": "four-grid", "photos": [{"photoId": "seed-01", "slot": 1}, {"photoId": "seed-02", "slot": 2}, {"photoId": "seed-03", "slot": 3}, {"photoId": "missing-photo", "slot": 4}]}
+    ],
+    "2027": []
+  }
+}

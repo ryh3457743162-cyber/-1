@@ -1,0 +1,17 @@
+{
+  "Version": "1",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "oss:PutObject",
+        "oss:GetObject",
+        "oss:DeleteObject"
+      ],
+      "Resource": [
+        "acs:oss:*:*:fanfan-hanhan-photos-1061513880/photos/originals/*",
+        "acs:oss:*:*:fanfan-hanhan-photos-1061513880/photos/thumbnails/*"
+      ]
+    }
+  ]
+}

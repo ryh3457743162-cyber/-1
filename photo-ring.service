@@ -1,0 +1,19 @@
+[Unit]
+Description=Fanfan and Hanhan Photo Ring
+After=network.target
+
+[Service]
+Type=simple
+User=photo-ring
+Group=photo-ring
+WorkingDirectory=/opt/photo-ring
+EnvironmentFile=/etc/photo-ring.env
+ExecStart=/opt/photo-ring/venv/bin/gunicorn --workers 2 --bind 127.0.0.1:8000 --access-logfile - app:app
+Restart=always
+RestartSec=3
+PrivateTmp=true
+ProtectSystem=full
+ReadWritePaths=/opt/photo-ring/data /opt/photo-ring/uploads
+
+[Install]
+WantedBy=multi-user.target

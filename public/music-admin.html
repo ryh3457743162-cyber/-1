@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>凡凡and涵涵 · 音乐管理</title>
+  <style>
+    :root{font-family:"PingFang SC","Microsoft YaHei",Arial,sans-serif;color:#38332f;background:#f4f1eb;--paper:#f4f1eb;--surface:#fffcf8;--wine:#99515d;--wine-deep:#7d3d49;--muted:#817a73;--line:rgba(82,69,59,.14)}
+    *{box-sizing:border-box}[hidden]{display:none!important}body{margin:0;min-height:100vh;background:var(--paper)}body.modal-open{overflow:hidden}button,input{font:inherit}button{cursor:pointer}button:disabled{opacity:.5;cursor:not-allowed}a{color:inherit;text-decoration:none}:is(button,input,a):focus-visible{outline:2px solid var(--wine);outline-offset:3px}
+    .shell{width:min(1080px,calc(100% - 40px));margin:auto;padding:25px 0 75px}.surface{background:var(--surface);border:1px solid #5c4c4115;border-radius:19px;box-shadow:0 10px 32px #3b2f270b}.login{width:min(430px,100%);margin:12vh auto;padding:28px}.login h1,.brand h1{margin:0;font:400 30px Georgia,"Songti SC",serif}.login input,.field input{width:100%;min-height:42px;padding:9px 13px;border:1px solid var(--line);border-radius:10px;background:white;color:inherit}.login input{margin:14px 0}.muted{color:var(--muted);font-size:12px;line-height:1.6}.error{color:var(--wine-deep)}
+    .top{display:flex;align-items:center;justify-content:space-between;gap:18px;margin-bottom:24px}.brand p{margin:5px 0 0;color:var(--muted);font-size:11px;letter-spacing:.18em}.top-actions{display:flex;align-items:center;gap:6px;flex-wrap:wrap}.top-actions a,.top-actions button{min-height:39px;padding:8px 13px;border:0;border-radius:999px;background:transparent;color:#69615b;font-size:12px}.top-actions a:hover,.top-actions button:hover{background:#ffffffa8;color:var(--wine-deep)}.top-actions a[aria-current]{background:#e9e3dc;color:#4d4140}
+    .section{padding:clamp(20px,3vw,30px);margin-bottom:22px}.section h2{margin:0 0 19px;font:400 23px Georgia,"Songti SC",serif}.current{display:flex;align-items:center;gap:16px;padding:18px;border:1px solid var(--line);border-radius:15px;background:#faf6f2}.note{display:grid;place-items:center;flex:none;width:46px;height:46px;border-radius:50%;background:#f0e1e3;color:var(--wine);font:26px Georgia,serif}.current-text{min-width:0;flex:1}.current-text strong{display:block;overflow:hidden;font-size:16px;white-space:nowrap;text-overflow:ellipsis}.current-text span{display:block;margin-top:5px;color:var(--muted);font-size:12px}.settings{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:22px}.setting{display:flex;align-items:center;justify-content:space-between;gap:13px;min-height:44px;color:#5a514b;font-size:13px}.setting input[type=range]{width:min(180px,55%);accent-color:var(--wine)}.setting input[type=checkbox]{width:19px;height:19px;accent-color:var(--wine)}.quiet,.primary{min-height:39px;padding:8px 14px;border-radius:10px;font-size:12px}.quiet{border:1px solid var(--line);background:white;color:#625952}.primary{border:1px solid var(--wine);background:var(--wine);color:#fff}.primary:hover{background:var(--wine-deep)}.heading{display:flex;align-items:center;justify-content:space-between;gap:12px}.heading h2{margin-bottom:0}.upload{display:grid;grid-template-columns:1fr 1fr;gap:13px;margin-top:20px}.field label{display:block;margin-bottom:7px;color:#615852;font-size:12px}.file{grid-column:1/-1}.file input{width:100%;padding:10px;border:1px dashed #cbbeb4;border-radius:11px;background:#faf8f4}.upload-actions{grid-column:1/-1;display:flex;align-items:center;gap:13px}.list{display:grid;gap:11px;margin-top:20px}.track{display:flex;align-items:center;gap:13px;padding:15px;border:1px solid var(--line);border-radius:14px;background:#fffdfa}.track-info{min-width:0;flex:1}.track-info strong{display:block;overflow:hidden;font-size:14px;white-space:nowrap;text-overflow:ellipsis}.track-info span{display:block;margin-top:5px;color:var(--muted);font-size:11px}.track-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.track-actions button{white-space:nowrap}.active{color:var(--wine-deep);font-size:11px}.preview{margin-top:15px;padding-top:14px;border-top:1px solid var(--line)}.preview strong{font-size:12px}.preview-row{display:flex;align-items:center;gap:10px;margin-top:9px}.preview-row input{flex:1;min-width:40px;accent-color:var(--wine)}.preview-row span{color:var(--muted);font-size:11px;white-space:nowrap}.toast{position:fixed;right:22px;bottom:22px;z-index:80;max-width:calc(100vw - 32px);padding:11px 16px;border-radius:10px;background:#4b4140;color:#fff;box-shadow:0 8px 22px #0002;font-size:12px}.toast.error{background:var(--wine-deep)}.modal{position:fixed;inset:0;z-index:90;display:grid;place-items:center;padding:20px;background:#2d23239c}.modal-card{width:min(400px,100%);padding:25px;border-radius:17px;background:#fffcf8;box-shadow:0 24px 60px #241c1b2d}.modal-card h2{margin:0;font:400 24px Georgia,"Songti SC",serif}.modal-card p{color:#716962;font-size:13px;line-height:1.7}.modal-actions{display:flex;justify-content:flex-end;gap:9px;margin-top:22px}
+    @media(max-width:700px){.top{align-items:flex-start;flex-direction:column}.settings,.upload{grid-template-columns:1fr}.file,.upload-actions{grid-column:auto}.track{align-items:flex-start}.track-actions{justify-content:flex-end}.current{align-items:flex-start}}
+    @media(max-width:440px){.shell{width:calc(100% - 28px)}.track{flex-wrap:wrap}.track-info{flex-basis:calc(100% - 65px)}.track-actions{width:100%;justify-content:flex-start}.toast{left:16px;right:16px;bottom:max(16px,env(safe-area-inset-bottom))}}
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <section class="surface login" id="login" hidden><h1>音乐管理</h1><p class="muted">使用与照片管理相同的密码。</p><input id="password" type="password" autocomplete="current-password" aria-label="管理密码" placeholder="管理密码"><button class="primary" id="login-button" type="button">登录</button><p class="muted error" id="login-status" role="alert"></p></section>
+    <div id="panel" hidden>
+      <header class="top"><div class="brand"><h1>凡凡and涵涵</h1><p>音乐管理</p></div><nav class="top-actions" aria-label="后台导航"><a href="/manage">照片管理</a><a href="/admin/book">书本排版</a><a href="/admin/music" aria-current="page">音乐管理</a><a href="/admin/comments">评论管理</a><a href="/" target="_blank" rel="noopener">查看网站 ↗</a><button id="logout" type="button">退出</button></nav></header>
+      <section class="surface section" aria-labelledby="current-heading"><h2 id="current-heading">网站背景音乐</h2><div class="current"><span class="note" aria-hidden="true">♪</span><div class="current-text"><strong id="current-title">尚未选择音乐</strong><span id="current-artist">从音乐库选一首作为背景音乐</span></div><button class="quiet" id="current-preview" type="button" disabled>试听</button></div><div class="settings"><label class="setting">开启网站音乐 <input id="enabled" type="checkbox"></label><label class="setting">循环播放 <input id="loop" type="checkbox"></label><label class="setting" for="default-volume">默认音量 <input id="default-volume" type="range" min="0" max="100" value="30"><span id="volume-label">30%</span></label><div class="setting"><span>首次播放渐入</span><span>约 3 秒</span></div></div><button class="quiet" id="disable" type="button">关闭网站音乐</button></section>
+      <section class="surface section" aria-labelledby="library-heading"><div class="heading"><h2 id="library-heading">音乐库</h2><span class="muted" id="music-count">0 首音乐</span></div><form class="upload" id="upload"><div class="field"><label for="title">歌曲标题 *</label><input id="title" name="title" maxlength="120" required></div><div class="field"><label for="artist">歌手（可选）</label><input id="artist" name="artist" maxlength="120"></div><div class="field file"><label for="music-file">音乐文件</label><input id="music-file" name="music" type="file" accept="audio/mpeg,.mp3" required><p class="muted">目前支持 MP3，单首不超过 30 MB。文件只保存到 OSS。</p></div><div class="upload-actions"><button class="primary" id="upload-button" type="submit">＋ 上传音乐</button><span class="muted" id="upload-state" role="status"></span></div></form><div class="list" id="music-list"></div><p class="muted" id="empty" hidden>音乐库还是空的，上传第一首音乐吧。</p><div class="preview" id="preview-area" hidden><strong id="preview-title">试听</strong><div class="preview-row"><button class="quiet" id="preview-toggle" type="button">暂停</button><input id="preview-progress" type="range" min="0" max="0" value="0" step="1" aria-label="试听进度"><span id="preview-time">00:00 / 00:00</span></div></div><p id="cleanup" class="muted" hidden><span id="cleanup-count"></span> <button class="quiet" id="retry-cleanup" type="button">重试清理 OSS</button></p></section>
+    </div>
+  </main>
+  <audio id="preview-audio" preload="none"></audio>
+  <div class="modal" id="delete-modal" role="dialog" aria-modal="true" aria-labelledby="delete-title" hidden><div class="modal-card"><h2 id="delete-title">删除这首音乐？</h2><p>音乐文件将从音乐库中移除。</p><div class="modal-actions"><button class="quiet" id="cancel-delete" type="button">取消</button><button class="primary" id="confirm-delete" type="button">删除</button></div></div></div>
+  <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+  <script>
+  (() => {
+    const $ = selector => document.querySelector(selector);
+    const audio = $('#preview-audio');
+    let music = [], settings = {}, pendingCount = 0, previewId = null, deleteId = null, toastTimer = null;
+    const fmt = seconds => Number.isFinite(seconds) ? `${String(Math.floor(seconds / 60)).padStart(2,'0')}:${String(Math.floor(seconds % 60)).padStart(2,'0')}` : '00:00';
+    async function api(url, options = {}) { const response = await fetch(url, options); let data = {}; try { data = await response.json(); } catch {} if (!response.ok) { const error = new Error(data.error || '操作失败，请稍后重试'); error.status = response.status; throw error; } return data; }
+    function toast(message, error = false) { const item = $('#toast'); item.textContent = message; item.classList.toggle('error', error); item.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => item.hidden = true, 3500); }
+    function stopPreview() { audio.pause(); audio.removeAttribute('src'); audio.load(); previewId = null; $('#preview-area').hidden = true; }
+    function render() {
+      const active = music.find(item => item.id === settings.activeMusicId);
+      $('#current-title').textContent = active?.title || '尚未选择音乐'; $('#current-artist').textContent = active?.artist || (active ? '背景音乐' : '从音乐库选一首作为背景音乐');
+      $('#current-preview').disabled = !active; $('#enabled').checked = Boolean(settings.musicEnabled && active); $('#enabled').disabled = !active; $('#loop').checked = Boolean(settings.musicLoop);
+      $('#default-volume').value = String(Math.round((settings.musicVolume ?? .3) * 100)); $('#volume-label').textContent = $('#default-volume').value + '%';
+      $('#music-count').textContent = `${music.length} 首音乐`; $('#empty').hidden = music.length > 0;
+      $('#cleanup').hidden = pendingCount === 0; $('#cleanup-count').textContent = `${pendingCount} 个音乐对象待清理`;
+      const list = $('#music-list'); list.replaceChildren();
+      for (const item of music) {
+        const row = document.createElement('div'); row.className = 'track';
+        const icon = document.createElement('span'); icon.className = 'note'; icon.textContent = '♪'; icon.setAttribute('aria-hidden', 'true');
+        const info = document.createElement('div'); info.className = 'track-info';
+        const name = document.createElement('strong'); name.textContent = item.title;
+        const sub = document.createElement('span'); sub.textContent = `${item.artist || '未填写歌手'} · ${fmt(item.duration)} · ${(item.fileSize / 1048576).toFixed(1)} MB`;
+        info.append(name, sub);
+        const actions = document.createElement('div'); actions.className = 'track-actions';
+        if (item.id === settings.activeMusicId) { const badge = document.createElement('span'); badge.className = 'active'; badge.textContent = settings.musicEnabled ? '当前背景音乐' : '已选择 · 网站音乐已关闭'; actions.append(badge); }
+        const preview = document.createElement('button'); preview.type = 'button'; preview.className = 'quiet'; preview.textContent = previewId === item.id && !audio.paused ? '暂停试听' : '▶ 试听'; preview.addEventListener('click', () => previewTrack(item));
+        const select = document.createElement('button'); select.type = 'button'; select.className = 'quiet'; select.textContent = '设为背景音乐'; select.disabled = item.id === settings.activeMusicId && settings.musicEnabled; select.addEventListener('click', () => saveSettings({activeMusicId:item.id,musicEnabled:true}));
+        const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'quiet'; remove.textContent = '删除'; remove.addEventListener('click', () => { deleteId = item.id; $('#delete-modal').hidden = false; document.body.classList.add('modal-open'); $('#cancel-delete').focus(); });
+        actions.append(preview,select,remove); row.append(icon,info,actions); list.append(row);
+      }
+    }
+    async function load() { try { const data = await api('/api/manage/music', {cache:'no-store'}); music = data.music; settings = data.settings; pendingCount = data.pendingOssDeletes.length; $('#login').hidden = true; $('#panel').hidden = false; render(); } catch(error) { if (error.status === 401) { $('#panel').hidden = true; $('#login').hidden = false; } else { toast(error.message,true); $('#login').hidden = false; } } }
+    async function saveSettings(changes) { try { const data = await api('/api/manage/music/settings', {method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(changes)}); settings = data.settings; render(); toast('音乐设置已保存'); } catch(error) { render(); toast(error.message,true); } }
+    async function previewTrack(item) {
+      if (previewId === item.id) { if (audio.paused) { try { await audio.play(); } catch { toast('试听暂时无法播放',true); } } else audio.pause(); render(); return; }
+      stopPreview(); previewId = item.id; audio.preload = 'none'; audio.src = `/api/music/stream/${encodeURIComponent(item.id)}`; $('#preview-title').textContent = `试听 · ${item.title}`; $('#preview-area').hidden = false;
+      try { await audio.play(); } catch { toast('试听暂时无法播放',true); } render();
+    }
+    $('#current-preview').addEventListener('click', () => { const item = music.find(track => track.id === settings.activeMusicId); if (item) previewTrack(item); });
+    $('#enabled').addEventListener('change', event => saveSettings({musicEnabled:event.target.checked}));
+    $('#disable').addEventListener('click', () => saveSettings({musicEnabled:false}));
+    $('#loop').addEventListener('change', event => saveSettings({musicLoop:event.target.checked}));
+    $('#default-volume').addEventListener('input', () => { $('#volume-label').textContent = $('#default-volume').value + '%'; });
+    $('#default-volume').addEventListener('change', () => saveSettings({musicVolume:Number($('#default-volume').value)/100}));
+    $('#upload').addEventListener('submit', async event => {
+      event.preventDefault(); const file = $('#music-file').files[0]; if (!file) return;
+      if (!file.name.toLowerCase().endsWith('.mp3')) { toast('目前只支持 MP3 文件',true); return; }
+      if (file.size > 30 * 1024 * 1024) { toast('单首音乐不能超过 30 MB',true); return; }
+      const button = $('#upload-button'); button.disabled = true; $('#upload-state').textContent = '正在上传到 OSS…';
+      try { const data = await api('/api/manage/music', {method:'POST',body:new FormData(event.target)}); music.push(data.music); event.target.reset(); render(); toast('音乐已上传到 OSS'); }
+      catch(error) { toast(error.message,true); }
+      finally { button.disabled = false; $('#upload-state').textContent = ''; }
+    });
+    function closeDelete() { deleteId = null; $('#delete-modal').hidden = true; document.body.classList.remove('modal-open'); }
+    $('#cancel-delete').addEventListener('click', closeDelete); $('#delete-modal').addEventListener('click', event => { if (event.target.id === 'delete-modal') closeDelete(); });
+    $('#confirm-delete').addEventListener('click', async () => { if (!deleteId) return; const id = deleteId; $('#confirm-delete').disabled = true; try { const data = await api('/api/manage/music/' + encodeURIComponent(id), {method:'DELETE'}); if (previewId === id) stopPreview(); music = music.filter(item => item.id !== id); if (settings.activeMusicId === id) { settings.activeMusicId = null; settings.musicEnabled = false; } if (data.cleanupPending) pendingCount++; closeDelete(); render(); toast(data.cleanupPending ? '已从音乐库移除，OSS 清理待重试' : '音乐已删除'); } catch(error) { toast(error.message,true); } finally { $('#confirm-delete').disabled = false; } });
+    $('#retry-cleanup').addEventListener('click', async () => { try { const data = await api('/api/manage/music/retry-deletes', {method:'POST'}); pendingCount = data.pending; render(); toast(data.pending ? '仍有音乐对象待清理' : 'OSS 音乐对象清理完成', data.pending > 0); } catch(error) { toast(error.message,true); } });
+    $('#preview-toggle').addEventListener('click', () => { if (audio.paused) audio.play().catch(() => toast('试听暂时无法播放',true)); else audio.pause(); });
+    $('#preview-progress').addEventListener('change', () => { if (Number.isFinite(audio.duration)) audio.currentTime = Number($('#preview-progress').value); });
+    audio.addEventListener('timeupdate', () => { $('#preview-progress').max = String(audio.duration || 0); $('#preview-progress').value = String(audio.currentTime); $('#preview-time').textContent = `${fmt(audio.currentTime)} / ${fmt(audio.duration)}`; });
+    audio.addEventListener('play', () => { $('#preview-toggle').textContent = '暂停'; render(); }); audio.addEventListener('pause', () => { $('#preview-toggle').textContent = '播放'; render(); });
+    $('#login-button').addEventListener('click', async () => { $('#login-button').disabled = true; try { await api('/api/login', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:$('#password').value})}); $('#password').value = ''; $('#login-status').textContent = ''; await load(); } catch(error) { $('#login-status').textContent = error.message; } finally { $('#login-button').disabled = false; } });
+    $('#password').addEventListener('keydown', event => { if (event.key === 'Enter') $('#login-button').click(); });
+    $('#logout').addEventListener('click', async () => { stopPreview(); await api('/api/logout', {method:'POST'}); $('#panel').hidden = true; $('#login').hidden = false; });
+    document.addEventListener('keydown', event => { if (event.key === 'Escape' && !$('#delete-modal').hidden) closeDelete(); });
+    load();
+  })();
+  </script>
+</body>
+</html>
