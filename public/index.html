@@ -262,6 +262,9 @@
     .intro-inner{padding-bottom:max(64px,env(safe-area-inset-bottom))}
     .lightbox-open .site-footer{visibility:hidden}
     @media(min-width:761px){.site-footer{left:42px;right:96px}}
+    @media(max-width:760px){
+      html:not(.story-cover-open) body.book-mode .site-footer{position:static;inset:auto;z-index:auto;padding:18px 78px max(26px,calc(env(safe-area-inset-bottom) + 16px)) 15px}
+    }
     @media(prefers-reduced-motion:reduce){.card{will-change:auto}.card-inner{animation:none!important}*{scroll-behavior:auto!important;transition-duration:.01ms!important;animation-duration:.01ms!important;animation-iteration-count:1!important}}
   </style>
 </head>
