@@ -252,6 +252,16 @@
     .story-cover-open .music-control{top:max(18px,env(safe-area-inset-top));bottom:auto}
     .story-cover-open .music-panel{top:calc(100% + 11px);bottom:auto}
     @media(max-width:600px){.music-control{right:15px;bottom:max(14px,env(safe-area-inset-bottom))}.music-panel{position:fixed;left:0;right:0;bottom:0;width:100%;padding:22px 22px max(25px,env(safe-area-inset-bottom));border-radius:21px 21px 0 0}.story-cover-open .music-panel{top:auto;bottom:0}}
+    /* One shared registration footer, outside the cover's inert site shell. */
+    :root{--site-footer-space:44px}
+    .site-footer{position:fixed;left:15px;right:78px;bottom:max(7px,env(safe-area-inset-bottom));z-index:155;display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:3px 14px;color:var(--muted);font-size:10px;line-height:1.6;letter-spacing:.03em;text-align:center;pointer-events:none}
+    .site-footer span,.site-footer a{max-width:100%;overflow-wrap:anywhere}
+    .site-footer a{color:inherit;text-decoration:none;pointer-events:auto;transition:color .2s ease}
+    .site-footer a:hover,.site-footer a:focus-visible{color:var(--rose-deep);text-decoration:underline;text-underline-offset:3px}
+    body:not(.book-mode) .bottombar{bottom:var(--site-footer-space)}
+    .intro-inner{padding-bottom:max(64px,env(safe-area-inset-bottom))}
+    .lightbox-open .site-footer{visibility:hidden}
+    @media(min-width:761px){.site-footer{left:42px;right:96px}}
     @media(prefers-reduced-motion:reduce){.card{will-change:auto}.card-inner{animation:none!important}*{scroll-behavior:auto!important;transition-duration:.01ms!important;animation-duration:.01ms!important;animation-iteration-count:1!important}}
   </style>
 </head>
@@ -286,6 +296,10 @@
   <div class="lightbox" id="lightbox" role="dialog" aria-modal="true" aria-hidden="true" aria-label="照片预览"><button class="close" id="close" type="button" aria-label="关闭预览">×</button><button class="lightbox-nav prev" id="lightbox-prev" type="button" aria-label="上一张照片">‹</button><img id="large" alt="" draggable="false"><button class="lightbox-nav next" id="lightbox-next" type="button" aria-label="下一张照片">›</button><p id="large-title" aria-live="polite"></p><button class="comment-open" id="comment-open" type="button">💬 0</button><button class="delete-photo" id="delete-photo" type="button" hidden>从年轮移除</button></div>
   <aside class="comment-drawer" id="comment-drawer" role="dialog" aria-modal="true" aria-label="照片留言" hidden><div class="comment-panel"><div class="comment-head"><div><h2>照片留言</h2><span class="comment-kicker">给这一刻留下一句话</span><p id="comment-photo-title"></p></div><button id="comment-close" type="button" aria-label="关闭留言">×</button></div><div class="comment-list" id="comment-list" aria-live="polite"></div><button id="comment-more" type="button" hidden>查看更多留言</button><form class="comment-form" id="comment-form"><input id="comment-nickname" maxlength="20" placeholder="昵称（选填）" aria-label="昵称"><textarea id="comment-content" maxlength="300" placeholder="把这一刻的感受写下来……" aria-label="留言内容" required></textarea><span class="comment-message" id="comment-message" role="status"></span><button id="comment-submit" type="submit">留下这句话</button></form></div></aside>
   </div>
+  <footer class="site-footer" aria-label="网站备案信息">
+    <span>© 2026 凡凡and涵涵</span>
+    <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener noreferrer">闽ICP备2026038360号-1</a>
+  </footer>
   <audio id="global-music-audio" preload="none"></audio>
   <div class="music-control" id="music-control" hidden>
     <span class="music-hint" id="music-hint">点击开启音乐</span>
