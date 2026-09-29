@@ -21,6 +21,7 @@ from werkzeug.utils import secure_filename
 import oss_storage
 import music_store
 import comment_store
+import book_cover_store
 
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -245,6 +246,16 @@ def book_layout_script():
     return send_from_directory(PUBLIC_DIR, "book-layouts.js")
 
 
+@app.get("/book-cover.js")
+def book_cover_script():
+    return send_from_directory(PUBLIC_DIR, "book-cover.js")
+
+
+@app.get("/book-cover.css")
+def book_cover_style():
+    return send_from_directory(PUBLIC_DIR, "book-cover.css")
+
+
 @app.get("/photos/<path:name>")
 def seed_image(name: str):
     match = re.fullmatch(r"photo-(\d{2})\.jpg", name)
@@ -317,6 +328,59 @@ def book_layout():
     layout["featuredComments"] = {item["id"]: public_comment(item) for item in readable_public_comments()
                                   if item.get("id") in ids and item.get("status") == "approved"}
     return jsonify(layout)
+
+
+def cover_photo(photo_id):
+    """Resolve the existing library ID without copying assets or exposing OSS keys."""
+    if not photo_id:
+        return None
+    data = read_data()
+    if photo_id in SEED_IDS:
+        if photo_id in data["hiddenSeedIds"]:
+            return None
+        filename = f"photo-{photo_id[5:]}.jpg"
+        if not (PUBLIC_DIR / "photos" / filename).is_file():
+            return None
+        photo = {"id": photo_id, "title": f"和宝宝的记忆 · {photo_id[5:]}",
+                 "src": f"/photos/{filename}"}
+        if data["seedOss"].get(photo_id, {}).get("thumbnailKey"):
+            photo["thumbnailSrc"] = f"/api/thumbnails/{photo_id}"
+        return photo
+    photo = next((item for item in data["photos"] if item.get("id") == photo_id), None)
+    if not photo or photo.get("deletedAt") or photo.get("deleted_at"):
+        return None
+    return {key: photo[key] for key in ("id", "title", "src", "thumbnailSrc") if key in photo}
+
+
+@app.get("/api/book-cover")
+def book_cover():
+    config = book_cover_store.read()
+    config.pop("updatedAt", None)
+    try:
+        photo = cover_photo(config["photoId"]) if config["showPhoto"] else None
+    except (OSError, ValueError):
+        app.logger.warning("Cover photo unavailable; using text cover")
+        photo = None
+    return jsonify({"cover": config, "photo": photo})
+
+
+@app.get("/api/manage/book-cover")
+@admin_required
+def manage_book_cover():
+    return jsonify({"cover": book_cover_store.read()})
+
+
+@app.put("/api/manage/book-cover")
+@admin_required
+def save_book_cover():
+    try:
+        config = book_cover_store.save(request.get_json(silent=True))
+    except ValueError as error:
+        return jsonify({"error": str(error)}), 400
+    except OSError:
+        app.logger.exception("Cover configuration save failed")
+        return jsonify({"error": "封面没有保存成功，请稍后重试"}), 500
+    return jsonify({"cover": config})
 
 
 def readable_public_comments() -> list[dict]:
