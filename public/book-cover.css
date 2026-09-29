@@ -1,0 +1,17 @@
+.album-cover-card{--cover-ink:#61504c;--cover-wine:#92515c;box-sizing:border-box;position:relative;isolation:isolate;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;width:100%;min-width:0;aspect-ratio:3/4;padding:46px 36px 34px;border:1px solid #bdaa9633;border-radius:4px 12px 12px 4px;background:radial-gradient(ellipse at 85% 12%,#e6d8c522,transparent 55%),repeating-linear-gradient(0deg,#fffdf800 0 3px,#bc9c7610 4px),#faf5eb;color:var(--cover-ink);text-align:center;box-shadow:inset 10px 0 16px -12px #69544580,inset 18px 0 1px -17px #b3a18a55,6px 8px 0 -4px #e9e0d3,0 22px 50px #4c352421;font-family:"KaiTi","STKaiti","Kaiti SC","Songti SC",Georgia,serif;overflow-wrap:anywhere;transform-origin:left center}
+.album-cover-card::after{content:"";position:absolute;inset:18px;border:1px solid #9a7d6130;border-radius:1px 7px 7px 1px;pointer-events:none;z-index:-1}
+.album-cover-card :is(h2,p,figure){margin:0;max-width:100%;min-width:0}
+.album-cover-title{order:10;width:100%;font-size:30px;font-weight:400;line-height:1.6;letter-spacing:.09em;color:#704e51;white-space:pre-wrap}
+.album-cover-subtitle{order:30;font-size:16px;line-height:1.8;letter-spacing:.08em;white-space:pre-wrap}
+.album-cover-date{order:40;font:12px/1.6 Georgia,"Songti SC",serif;letter-spacing:.22em;color:#9e877d;white-space:pre-wrap}
+.album-cover-footer{order:60;margin-top:auto!important;padding-top:16px;font-size:13px;line-height:1.9;color:#9a847b;letter-spacing:.04em;white-space:pre-wrap}
+.album-cover-mark{order:50;font:19px/1 Georgia,serif;color:#a76d7680}
+.album-cover-photo{order:20;align-self:center;width:82%;aspect-ratio:4/3;flex-shrink:0;overflow:hidden;box-shadow:0 8px 18px #67503b15;background:#f4ede2}
+.album-cover-photo img{display:block;width:100%;height:100%;object-fit:cover}
+.album-cover-card[data-align="left"] .album-cover-title{text-align:left}.album-cover-card[data-align="right"] .album-cover-title{text-align:right}
+.album-cover-card[data-photo-position="top"] .album-cover-photo{order:5}.album-cover-card[data-photo-position="bottom"] .album-cover-photo{order:45}
+.album-cover-card[data-layout="photo"] .album-cover-photo{width:100%;aspect-ratio:4/5}.album-cover-card[data-layout="photo"]{gap:13px;padding:32px 30px}.album-cover-card[data-layout="photo"] .album-cover-title{font-size:26px}
+.album-cover-card[data-layout="minimal"]{gap:25px;padding-block:64px}.album-cover-card[data-layout="minimal"] .album-cover-title{font-size:36px}.album-cover-card:not(.has-photo) .album-cover-title{margin-top:auto}.album-cover-card:not(.has-photo) .album-cover-footer{margin-top:auto!important}
+.album-cover-card[data-layout="polaroid"] .album-cover-photo{width:87%;padding:10px 10px 30px;background:#fffefa;aspect-ratio:1;box-shadow:0 8px 20px #62452b26;transform:rotate(-1.5deg)}.album-cover-card[data-layout="polaroid"] .album-cover-photo img{aspect-ratio:1;object-fit:cover}.album-cover-card[data-layout="polaroid"]::after{border-style:dashed;opacity:.5}
+@media(max-width:760px){.album-cover-card{padding:32px 26px 26px;gap:14px}.album-cover-title{font-size:26px}.album-cover-subtitle{font-size:15px}.album-cover-footer{font-size:12px}.album-cover-card[data-layout="minimal"] .album-cover-title{font-size:30px}.album-cover-card[data-layout="photo"]{padding:28px 24px}.album-cover-card[data-layout="photo"] .album-cover-title{font-size:24px}}
+@media(prefers-reduced-motion:reduce){.album-cover-card{transition:none!important}}

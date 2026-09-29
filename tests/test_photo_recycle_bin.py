@@ -16,6 +16,9 @@ class PhotoRecycleTest(unittest.TestCase):
         self.store = self.site.comment_store
         self.temp = tempfile.TemporaryDirectory(dir=self.site.BASE_DIR)
         root = Path(self.temp.name)
+        self.cover_paths = self.site.book_cover_store.DATA_FILE, self.site.book_cover_store.LOCK_FILE
+        self.site.book_cover_store.DATA_FILE = root/'book-cover.json'
+        self.site.book_cover_store.LOCK_FILE = root/'book-cover.lock'
         self.original = self.site.DATA_FILE, self.site.BOOK_LAYOUT_FILE, self.site.PUBLIC_DIR, self.site.UPLOAD_DIR, self.store.DATA_FILE, self.store.LOCK_FILE
         self.site.DATA_FILE = root/'photos.json'
         self.site.BOOK_LAYOUT_FILE = root/'book-layout.json'
@@ -50,6 +53,7 @@ class PhotoRecycleTest(unittest.TestCase):
 
     def tearDown(self):
         patch.stopall()
+        self.site.book_cover_store.DATA_FILE, self.site.book_cover_store.LOCK_FILE = self.cover_paths
         self.site.DATA_FILE,self.site.BOOK_LAYOUT_FILE,self.site.PUBLIC_DIR,self.site.UPLOAD_DIR,self.store.DATA_FILE,self.store.LOCK_FILE = self.original
         self.temp.cleanup()
 

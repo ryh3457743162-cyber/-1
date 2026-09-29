@@ -11,6 +11,7 @@
     try{if(new URLSearchParams(location.search).get('bookPreview')!=='1')document.documentElement.classList.add('story-cover-open')}
     catch{document.documentElement.classList.add('story-cover-open')}
   </script>
+  <link rel="stylesheet" href="/book-cover.css?v=cover-v1">
   <style>
     :root{
       --paper:#f1eee8;
@@ -266,6 +267,19 @@
       html:not(.story-cover-open) body.book-mode .site-footer{position:static;inset:auto;z-index:auto;padding:18px 78px max(26px,calc(env(safe-area-inset-bottom) + 16px)) 15px}
     }
     @media(prefers-reduced-motion:reduce){.card{will-change:auto}.card-inner{animation:none!important}*{scroll-behavior:auto!important;transition-duration:.01ms!important;animation-duration:.01ms!important;animation-iteration-count:1!important}}
+
+    .album-cover-screen{width:min(440px,calc(100vw - 38px));display:flex;flex-direction:column;align-items:center;gap:24px;perspective:1500px}
+    .album-open-button{min-height:46px;padding:11px 24px;border:1px solid #aa78804d;border-radius:999px;background:#fffcf6;color:#835560;font:14px "KaiTi","STKaiti","Songti SC",serif;letter-spacing:.08em;box-shadow:0 4px 12px #6e4d3710;cursor:pointer;transition:background .2s,transform .2s}
+    .album-open-button:hover{background:#f3e8e5;transform:translateY(-1px)}.album-open-button:focus-visible{outline:2px solid #99515d;outline-offset:5px}
+    .stage[data-view="book"].album-cover-showing{height:auto;min-height:calc(100dvh - 76px);display:grid;place-items:center;padding:105px 0 90px;touch-action:pan-y}
+    body.album-cover-mode .site-footer{position:static;inset:auto;z-index:auto;padding:18px 78px max(26px,calc(env(safe-area-inset-bottom) + 16px)) 15px}
+    .album-cover-showing ~ .bottombar{display:none!important}
+    .album-cover-card{transition:transform .65s ease,opacity .65s ease;backface-visibility:hidden}
+    .album-cover-opening .album-cover-card{transform:rotateY(-85deg);opacity:0}.album-cover-opening .album-open-button{opacity:0;pointer-events:none}
+    .album-cover-opening.album-fade-only .album-cover-card{transform:none}
+    @media(max-width:760px){.stage[data-view="book"].album-cover-showing{padding:94px 0 62px;min-height:calc(100dvh - 76px)}.album-cover-screen{width:min(370px,calc(100vw - 40px));gap:22px}.album-cover-opening .album-cover-card{transform:none;opacity:0}}
+    @media(prefers-reduced-motion:reduce){.album-cover-card{transition:none}.album-cover-opening .album-cover-card{transform:none}}
+
   </style>
 </head>
 <body class="book-mode">
@@ -289,7 +303,8 @@
     <div class="grain"></div><div class="orbit-line"></div>
     <div class="center"><span class="love-mark" aria-label="Our Story"><span aria-hidden="true">♥</span> OUR STORY <span aria-hidden="true">♥</span></span><div class="year-switch" role="group" aria-label="切换年份"><button class="year-arrow" id="prev-year" type="button" aria-label="切换年份">‹</button><button class="year" id="year" type="button" aria-label="当前 2026 年，点击切换到 2027 年">2026</button><button class="year-arrow" id="next-year" type="button" aria-label="切换年份">›</button></div><span class="sub" id="year-sub">正在载入照片</span></div>
     <div id="cards" role="list" aria-label="照片"></div>
-    <section class="book-reader" id="book-reader" aria-label="书本照片浏览" hidden><div class="book-object" id="book-object"><div class="book-page left" id="book-left"></div><div class="book-page right" id="book-right"></div><div class="book-leaf" id="book-leaf" aria-hidden="true" hidden></div></div><div class="book-controls" id="book-controls"><button id="book-prev" type="button" aria-label="向前翻一页">‹</button><span id="book-count" aria-live="polite">00 / 00</span><button id="book-next" type="button" aria-label="向后翻一页">›</button></div><div class="book-years" role="group" aria-label="切换年份"><button class="book-year" type="button" data-year="2026" aria-pressed="true">2026</button><button class="book-year" type="button" data-year="2027" aria-pressed="false">2027</button></div></section>
+    <section class="album-cover-screen" id="album-cover-screen" aria-label="纪念册封面" hidden><div id="album-cover-card"></div><button class="album-open-button" id="album-open-button" type="button">翻开我们的故事 <span aria-hidden="true">↗</span></button></section>
+    <section class="book-reader" id="book-reader" tabindex="-1" aria-label="书本照片浏览" hidden><div class="book-object" id="book-object"><div class="book-page left" id="book-left"></div><div class="book-page right" id="book-right"></div><div class="book-leaf" id="book-leaf" aria-hidden="true" hidden></div></div><div class="book-controls" id="book-controls"><button id="book-prev" type="button" aria-label="向前翻一页">‹</button><span id="book-count" aria-live="polite">00 / 00</span><button id="book-next" type="button" aria-label="向后翻一页">›</button></div><div class="book-years" role="group" aria-label="切换年份"><button class="book-year" type="button" data-year="2026" aria-pressed="true">2026</button><button class="book-year" type="button" data-year="2027" aria-pressed="false">2027</button></div></section>
     <div class="empty" id="empty"><div class="empty-panel"><h2>让照片围成一圈</h2><p id="empty-message">正在载入照片…</p></div></div>
   </main>
   <header class="topbar"><button class="brand" id="open-cover" type="button" aria-label="凡凡和涵涵，重新进入纪念册封面">凡凡 <span class="amp">&amp;</span> 涵涵<small>2026 — ∞</small></button><nav class="views" aria-label="照片布局"><button class="pill" data-view="book" aria-pressed="true">书本</button><button class="pill" data-view="atlas" aria-pressed="false">图集</button><button class="pill" data-view="flat" aria-pressed="false">平面</button></nav><div class="tools"><button class="pill" id="restore-photos" type="button" hidden>恢复照片</button></div></header>
@@ -314,6 +329,7 @@
       <label for="music-volume">音量 <input id="music-volume" type="range" min="0" max="100" step="1" value="30" aria-label="音乐音量"></label>
     </div>
   </div>
+  <script src="/book-cover.js?v=cover-v1"></script>
   <script src="book-layouts.js?v=note-stack-20260926"></script>
   <script src="/music-player.js?v=2"></script>
   <script>
@@ -336,6 +352,7 @@
       if(!document.documentElement.classList.contains('story-cover-open'))return;
       siteShell.inert=false;introCover.inert=true;introCover.setAttribute('aria-hidden','true');
       document.documentElement.classList.remove('story-cover-open');
+      renderAlbumCover();
       openCoverButton.focus({preventScroll:true});
     }
     openCoverButton.addEventListener('click',showCover);
@@ -418,6 +435,55 @@
       }
       bookPageIndex=Math.min(bookPageIndex,Math.max(0,bookPages.length-1));
     }
+
+    let albumCoverOpen=true,albumCoverOpening=false,albumCoverTimer=0,albumConfig={...BookCover.defaults},albumPhoto=null;
+    const albumScreen=$('#album-cover-screen'),albumCard=$('#album-cover-card'),albumButton=$('#album-open-button');
+    function applyAlbumVisibility(){
+      const visible=view==='book'&&albumCoverOpen;
+      albumScreen.hidden=!visible;stage.classList.toggle('album-cover-showing',visible);
+      document.body.classList.toggle('album-cover-mode',visible);
+      bookReader.hidden=view!=='book'||visible;
+      if(visible){empty.hidden=true;renderAlbumCover()}
+    }
+    function renderAlbumCover(){
+      if(view!=='book'||!albumCoverOpen)return;
+      const ready=!document.documentElement.classList.contains('story-cover-open');
+      BookCover.render(albumCard,albumConfig,ready?albumPhoto:null);
+    }
+    function showAlbumCover(){
+      clearTimeout(albumCoverTimer);albumCoverOpening=false;albumCoverOpen=true;
+      albumScreen.classList.remove('album-cover-opening','album-fade-only');albumButton.disabled=false;
+      stopBookTurn();bookPageIndex=0;bookShown=-1;applyAlbumVisibility();
+    }
+    function finishAlbumOpen(){
+      if(!albumCoverOpening)return;
+      clearTimeout(albumCoverTimer);albumCoverOpening=false;albumCoverOpen=false;
+      albumScreen.classList.remove('album-cover-opening');albumButton.disabled=false;
+      applyAlbumVisibility();build();
+      bookReader.focus({preventScroll:true});
+    }
+    function openAlbum(){
+      if(view!=='book'||!albumCoverOpen||albumCoverOpening)return;
+      albumCoverOpening=true;albumButton.disabled=true;
+      if(reduced.matches){finishAlbumOpen();return}
+      try{
+        const canRotate=window.CSS?.supports?.('transform-style','preserve-3d')&&window.CSS?.supports?.('perspective','1000px');
+        albumScreen.classList.toggle('album-fade-only',!canRotate);
+        albumScreen.classList.add('album-cover-opening');
+      }catch{finishAlbumOpen();return}
+      // Timeout also completes opening if transitions are unavailable or interrupted.
+      albumCoverTimer=setTimeout(finishAlbumOpen,700);
+    }
+    albumButton.addEventListener('click',openAlbum);
+    albumCard.addEventListener('click',openAlbum);
+    albumCard.addEventListener('transitionend',event=>{if(event.target===albumCard&&event.propertyName==='opacity')finishAlbumOpen()});
+    async function loadAlbumCover(){
+      try{const response=await fetch('/api/book-cover',{cache:'no-store'});if(!response.ok)throw new Error('cover');
+        const data=await response.json();albumConfig={...BookCover.defaults,...data.cover};albumPhoto=data.photo||null;
+      }catch{albumConfig={...BookCover.defaults};albumPhoto=null}
+      renderAlbumCover();
+    }
+
     function setYear(year){
       if(year!=='2026'&&year!=='2027')return;
       stopBookTurn();
@@ -445,6 +511,7 @@
       empty.querySelector('h2').textContent=view==='book'?'书本尚未排版':'让照片围成一圈';
       $('#empty-message').textContent=loading?'正在载入照片…':loadError?'照片暂时无法加载，请稍后刷新页面。':view==='book'&&!bookPages.length?'这个年份的书本还没有页面。':`这个年份暂时没有照片，请切换到 ${selectedYear==='2026'?'2027':'2026'} 年。`;
       $('#restore-photos').hidden=removedSeedKeys.size===0;
+      applyAlbumVisibility();
       if(!photos.length){$('#year-sub').textContent=loading?'正在载入照片':loadError?'加载失败':'0张photo';$('#photo-title').textContent=loading?'正在载入照片':loadError?'照片暂时无法加载':`${selectedYear} 年暂无照片`;$('#photo-detail').textContent='可切换年份查看照片';$('#counter').textContent='00 / 00';$('#book-count').textContent='00 / 00';updateStoryNav(0);if(view==='book'&&bookPages.length)showBookPage(bookPageIndex);return}
       showMoment(0);
       render(true);
@@ -521,7 +588,7 @@
       bookObject.style.setProperty('--page-shadow',String((phase*.65).toFixed(3)));
     }
     function showBookPage(index,animateTurn=false){
-      if(!bookPages.length)return;
+      if(albumCoverOpen||!bookPages.length)return;
       stopBookTurn();
       const previous=bookShown;bookShown=index;bookPageIndex=index;
       $('#book-count').textContent=`${String(index+1).padStart(2,'0')} / ${String(bookPages.length).padStart(2,'0')}`;
@@ -581,13 +648,13 @@
         loadPreview(img,photos[i]);
       });
     }
-    function render(instant=false,ms=16){if(view==='book'){if(bookPages.length&&bookShown!==bookPageIndex)showBookPage(bookPageIndex,!instant);return false}if(!photos.length)return false;const ease=instant||reduced.matches?1:1-Math.exp(-ms/120);position+=(target-position)*ease;let moving=Math.abs(target-position)>.002;const w=stage.clientWidth,h=stage.clientHeight,current=wrap(Math.round(position),photos.length);
+    function render(instant=false,ms=16){if(view==='book'){if(albumCoverOpen)return false;if(bookPages.length&&bookShown!==bookPageIndex)showBookPage(bookPageIndex,!instant);return false}if(!photos.length)return false;const ease=instant||reduced.matches?1:1-Math.exp(-ms/120);position+=(target-position)*ease;let moving=Math.abs(target-position)>.002;const w=stage.clientWidth,h=stage.clientHeight,current=wrap(Math.round(position),photos.length);
       if(current!==active){active=current;showMoment(current)}
       cards.forEach((card,i)=>{const d=wrap(i-position+photos.length/2,photos.length)-photos.length/2,p=pose(d,w,h,i);card.style.visibility=p.opacity<=0?'hidden':'visible';card.style.opacity=p.opacity.toFixed(3);card.style.zIndex=String(Math.round((p.depth+10)*100));card.style.transform=`translate(-50%,-50%) perspective(1000px) translate3d(${p.x.toFixed(1)}px,${p.y.toFixed(1)}px,${p.z.toFixed(1)}px) rotateY(${p.rotY.toFixed(1)}deg) rotateZ(${p.rotZ.toFixed(1)}deg) scale(${(p.s/160).toFixed(4)})`;card.setAttribute('aria-hidden',p.opacity<=0?'true':'false')});loadVisibleCardImages();return moving;}
     function updateStoryNav(index){const count=photos.length;if(!count){$('#moment-prev-label').textContent='—';$('#moment-current-label').textContent='00';$('#moment-next-label').textContent='—';return}const label=i=>String(wrap(i,count)+1).padStart(2,'0');$('#moment-prev-label').textContent=label(index-1);$('#moment-current-label').textContent=label(index);$('#moment-next-label').textContent=label(index+1)}
     function animate(t){const ms=last?Math.min(t-last,50):16;last=t;if(render(false,ms))frame=requestAnimationFrame(animate);else{frame=0;last=0;if(Math.abs(position)>photos.length*10){const laps=Math.trunc(position/photos.length)*photos.length;position-=laps;target-=laps;}}}
     function wake(){if(!frame)frame=requestAnimationFrame(animate)}
-    function switchView(v){view=v;stage.dataset.view=v;document.body.classList.toggle('book-mode',v==='book');if(v!=='book'&&scrollY)scrollTo(0,0);bookReader.hidden=v!=='book';bookObject.hidden=!bookPages.length;$('#book-controls').hidden=!bookPages.length;empty.hidden=(v==='book'?bookPages.length:photos.length)>0;empty.querySelector('h2').textContent=v==='book'?'书本尚未排版':'让照片围成一圈';$('#empty-message').textContent=v==='book'&&!bookPages.length?'这个年份的书本还没有页面。':`这个年份暂时没有照片，请切换到 ${selectedYear==='2026'?'2027':'2026'} 年。`;list.setAttribute('aria-hidden',String(v==='book'));document.querySelectorAll('.views [data-view]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.view===v)));if(v==='book'&&bookPages.length){bookShown=-1;showBookPage(bookPageIndex)}else stopBookTurn();render(true);wake()}
+    function switchView(v){view=v;stage.dataset.view=v;document.body.classList.toggle('book-mode',v==='book');if(v!=='book'&&scrollY)scrollTo(0,0);bookReader.hidden=v!=='book';bookObject.hidden=!bookPages.length;$('#book-controls').hidden=!bookPages.length;empty.hidden=(v==='book'?bookPages.length:photos.length)>0;empty.querySelector('h2').textContent=v==='book'?'书本尚未排版':'让照片围成一圈';$('#empty-message').textContent=v==='book'&&!bookPages.length?'这个年份的书本还没有页面。':`这个年份暂时没有照片，请切换到 ${selectedYear==='2026'?'2027':'2026'} 年。`;list.setAttribute('aria-hidden',String(v==='book'));document.querySelectorAll('.views [data-view]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.view===v)));if(v==='book')showAlbumCover();else{clearTimeout(albumCoverTimer);albumCoverOpening=false;stopBookTurn();applyAlbumVisibility()}render(true);wake()}
     document.querySelectorAll('.views [data-view]').forEach(b=>b.addEventListener('click',()=>switchView(b.dataset.view)));
     for(const id of ['year','prev-year','next-year'])$("#"+id).addEventListener('click',()=>setYear(selectedYear==='2026'?'2027':'2026'));
     document.querySelectorAll('.book-year').forEach(button=>button.addEventListener('click',()=>setYear(button.dataset.year)));
@@ -661,7 +728,7 @@
     $('#delete-photo').addEventListener('click',()=>{if(openIndex<0)return;const photo=lightboxPool[openIndex];closeLightbox();removePhoto(photo)});
     $('#undo-delete').addEventListener('click',async()=>{const undo=undoAction;if(!undo)return;undoAction=null;try{showStatus(await undo()?'已恢复照片':'已恢复显示，但保存失败')}catch{showStatus('已恢复显示，但保存失败')}});
     $('#restore-photos').addEventListener('click',restorePhotos);
-    document.addEventListener('keydown',e=>{if(['ArrowLeft','ArrowUp','ArrowRight','ArrowDown','Home'].includes(e.key)&&e.target instanceof Element&&e.target.closest('input,textarea,select,button,a[href],summary,[contenteditable]:not([contenteditable="false"]),[role="slider"],[role="button"],[role="textbox"],[role="combobox"],[role="spinbutton"],[role="listbox"],[role="menuitem"],audio[controls],video[controls]'))return;if(!$('#comment-drawer').hidden){if(e.key==='Escape')closeComments();return}if(document.documentElement.classList.contains('story-cover-open'))return;if($('#lightbox').classList.contains('open')){if(e.key==='Escape')closeLightbox();else if(e.key==='ArrowLeft'){e.preventDefault();stepLightbox(-1)}else if(e.key==='ArrowRight'){e.preventDefault();stepLightbox(1)}return}if(e.altKey||e.metaKey||e.ctrlKey)return;if(['ArrowLeft','ArrowUp','ArrowRight','ArrowDown'].includes(e.key)){e.preventDefault();if(view==='book')stepBook(['ArrowRight','ArrowDown'].includes(e.key)?1:-1);else{target=Math.round(target)+(['ArrowRight','ArrowDown'].includes(e.key)?1:-1);wake()}}else if(e.key==='Home'){e.preventDefault();if(view==='book'&&bookPages.length)showBookPage(0);else{target=0;wake()}}});
+    document.addEventListener('keydown',e=>{if(['ArrowLeft','ArrowUp','ArrowRight','ArrowDown','Home'].includes(e.key)&&e.target instanceof Element&&e.target.closest('input,textarea,select,button,a[href],summary,[contenteditable]:not([contenteditable="false"]),[role="slider"],[role="button"],[role="textbox"],[role="combobox"],[role="spinbutton"],[role="listbox"],[role="menuitem"],audio[controls],video[controls]'))return;if(!$('#comment-drawer').hidden){if(e.key==='Escape')closeComments();return}if(document.documentElement.classList.contains('story-cover-open'))return;if($('#lightbox').classList.contains('open')){if(e.key==='Escape')closeLightbox();else if(e.key==='ArrowLeft'){e.preventDefault();stepLightbox(-1)}else if(e.key==='ArrowRight'){e.preventDefault();stepLightbox(1)}return}if(view==='book'&&albumCoverOpen)return;if(e.altKey||e.metaKey||e.ctrlKey)return;if(['ArrowLeft','ArrowUp','ArrowRight','ArrowDown'].includes(e.key)){e.preventDefault();if(view==='book')stepBook(['ArrowRight','ArrowDown'].includes(e.key)?1:-1);else{target=Math.round(target)+(['ArrowRight','ArrowDown'].includes(e.key)?1:-1);wake()}}else if(e.key==='Home'){e.preventDefault();if(view==='book'&&bookPages.length)showBookPage(0);else{target=0;wake()}}});
     async function loadFiles(input){const chosen=Array.from(input.files||[]);input.value='';const heic=chosen.filter(f=>/\.(heic|heif)$/i.test(f.name)||/^image\/(heic|heif)$/i.test(f.type));const files=chosen.filter(f=>!heic.includes(f)&&(f.type.startsWith('image/')||/\.(jpe?g|png|webp|gif|bmp|avif)$/i.test(f.name)));if(!files.length){showStatus(heic.length?'HEIC 无法直接显示，请先转换成 JPG 或 PNG':'没有找到可读取的图片，请选 JPG、PNG 或 WebP');return}const year=selectedYear,next=files.map(f=>{const path=f.webkitRelativePath||f.name;return {title:f.name.replace(/\.[^.]+$/,''),year,path,src:URL.createObjectURL(f),blob:f,key:`${year}|${path}|${f.size}|${f.lastModified}`}});const result=await addPhotos(next);let message=result.added?(result.saved?`已添加并保存 ${result.added} 张到 ${year} 年`:`已添加 ${result.added} 张，但浏览器未能保存，关闭后会丢失`):'这些照片已经添加过了';if(heic.length)message+=`；另有 ${heic.length} 张 HEIC 需先转换`;showStatus(message);}
     async function loadPublishedPhotos(){
       try{
@@ -689,7 +756,7 @@
       }catch{bookLayoutConfigured=false;deriveBookPages();if(view==='book')build()}
     }
     const previewYear=new URLSearchParams(location.search).get('bookYear');
-    window.addEventListener('resize',()=>{stopBookTurn();render(true)});reduced.addEventListener('change',()=>{if(reduced.matches)stopBookTurn();render(true)});setYear(previewYear==='2027'?'2027':'2026');Promise.all([loadPublishedPhotos(),loadBookLayout()]);
+    window.addEventListener('resize',()=>{stopBookTurn();render(true)});reduced.addEventListener('change',()=>{if(reduced.matches)stopBookTurn();render(true)});setYear(previewYear==='2027'?'2027':'2026');Promise.all([loadPublishedPhotos(),loadBookLayout(),loadAlbumCover()]);
     document.addEventListener('visibilitychange',()=>{if(!document.hidden){loadPublishedPhotos();loadBookLayout()}});
   })();
   </script>

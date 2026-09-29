@@ -22,6 +22,7 @@ import oss_storage
 import music_store
 import comment_store
 import photo_lifecycle
+import book_cover_store
 
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -195,14 +196,14 @@ def admin_required(function):
 @app.before_request
 def lock_photo_lifecycle():
     if request.path.startswith(("/api/photos", "/api/images/", "/api/thumbnails/", "/photos/",
-                                "/api/book-layout", "/api/manage/photos", "/api/manage/trash",
+                                "/api/book-layout", "/api/book-cover", "/api/manage/book-cover", "/api/manage/photos", "/api/manage/trash",
                                 "/api/manage/upload", "/api/manage/book-layout", "/api/manage/comments",
                                 "/api/manage/oss/retry-deletes")):
         guard = photo_lifecycle.locked(DATA_FILE)
         try:
             guard.__enter__()
             g.photo_guard = guard
-            photo_lifecycle.recover(DATA_FILE, BOOK_LAYOUT_FILE, comment_store.DATA_FILE)
+            photo_lifecycle.recover(DATA_FILE, BOOK_LAYOUT_FILE, comment_store.DATA_FILE, book_cover_store.DATA_FILE)
         except Exception:
             app.logger.error("Photo metadata temporarily unavailable")
             return jsonify({"error": "照片数据暂时不可用，请稍后重试"}), 503
@@ -301,6 +302,16 @@ def book_layout_script():
     return send_from_directory(PUBLIC_DIR, "book-layouts.js")
 
 
+@app.get("/book-cover.js")
+def book_cover_script():
+    return send_from_directory(PUBLIC_DIR, "book-cover.js")
+
+
+@app.get("/book-cover.css")
+def book_cover_style():
+    return send_from_directory(PUBLIC_DIR, "book-cover.css")
+
+
 @app.get("/photos/<path:name>")
 def seed_image(name: str):
     match = re.fullmatch(r"photo-(\d{2})\.jpg", name)
@@ -382,6 +393,51 @@ def book_layout():
                                   if item.get("id") in ids and item.get("status") == "approved"
                                   and item.get("photoId") in active_ids}
     return jsonify(layout)
+
+
+def cover_photo(photo_id):
+    """Resolve the existing library ID without copying assets or exposing OSS keys."""
+    if not photo_id:
+        return None
+    photo = photo_record(read_data(), photo_id)
+    if not photo or photo.get("deletedAt") or photo.get("deleted_at"):
+        return None
+    return {key: photo[key] for key in ("id", "title", "src", "thumbnailSrc") if key in photo}
+
+
+@app.get("/api/book-cover")
+def book_cover():
+    config = book_cover_store.read()
+    config.pop("updatedAt", None)
+    try:
+        photo = cover_photo(config["photoId"]) if config["showPhoto"] else None
+    except (OSError, ValueError):
+        app.logger.warning("Cover photo unavailable; using text cover")
+        photo = None
+    return jsonify({"cover": config, "photo": photo})
+
+
+@app.get("/api/manage/book-cover")
+@admin_required
+def manage_book_cover():
+    return jsonify({"cover": book_cover_store.read()})
+
+
+@app.put("/api/manage/book-cover")
+@admin_required
+def save_book_cover():
+    try:
+        value = book_cover_store.validate(request.get_json(silent=True))
+        if value["photoId"] and not cover_photo(value["photoId"]):
+            if value["photoId"] != book_cover_store.read()["photoId"]:
+                return jsonify({"error": "封面照片已不可用，请重新选择"}), 409
+        config = book_cover_store.save(value)
+    except ValueError as error:
+        return jsonify({"error": str(error)}), 400
+    except OSError:
+        app.logger.exception("Cover configuration save failed")
+        return jsonify({"error": "封面没有保存成功，请稍后重试"}), 500
+    return jsonify({"cover": config})
 
 
 def readable_public_comments() -> list[dict]:
@@ -1105,6 +1161,17 @@ def purge_photo(photo_id: str):
         except (ValueError, KeyError, TypeError, AttributeError):
             app.logger.error("Photo purge blocked: invalid relationship metadata photoId=%s", photo_id)
             return jsonify({"error": "照片关联数据需要人工核查，未执行永久删除"}), 409
+        # Validate cover association before deleting any resource. Preserve unrelated text.
+        cover = None
+        if book_cover_store.DATA_FILE.exists():
+            try:
+                cover = json.loads(book_cover_store.DATA_FILE.read_text(encoding="utf-8"))
+                book_cover_store.validate(cover)
+                if cover.get("photoId") == photo_id:
+                    cover.update(photoId=None, showPhoto=False, updatedAt=datetime.now(timezone.utc).isoformat())
+            except (OSError, ValueError, TypeError):
+                app.logger.error("Photo purge blocked: invalid cover metadata photoId=%s", photo_id)
+                return jsonify({"error": "封面关联数据需要人工核查，未执行永久删除"}), 409
         state = data["seedStates"].setdefault(photo_id, {}) if photo_id in SEED_IDS else target
         try:
             if not state.get("purgeStartedAt"):
@@ -1128,7 +1195,7 @@ def purge_photo(photo_id: str):
                 data["hiddenSeedIds"] = sorted(set(data["hiddenSeedIds"]) | {photo_id})
             else:
                 data["photos"] = [item for item in data["photos"] if item["id"] != photo_id]
-            photo_lifecycle.commit(DATA_FILE, BOOK_LAYOUT_FILE, comment_store.DATA_FILE, data, book, remaining)
+            photo_lifecycle.commit(DATA_FILE, BOOK_LAYOUT_FILE, comment_store.DATA_FILE, data, book, remaining, book_cover_store.DATA_FILE, cover)
         except Exception as error:
             app.logger.error("Photo purge incomplete photoId=%s result=retry-required errorType=%s", photo_id, type(error).__name__)
             return jsonify({"error": "永久删除未完成，记录和清理进度已保留，请重试。此照片暂不能恢复。"}), 502

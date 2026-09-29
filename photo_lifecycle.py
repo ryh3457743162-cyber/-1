@@ -58,25 +58,30 @@ def locked(photos_file: Path):
                     fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
 
 
-def recover(photos_file: Path, book_file: Path, comments_file: Path) -> None:
+def recover(photos_file: Path, book_file: Path, comments_file: Path, cover_file: Path | None = None) -> None:
     """Roll forward an already prepared purge; callers must hold locked()."""
     journal = photos_file.with_suffix('.purge-journal.json')
     if not journal.exists():
         return
     value = json.loads(journal.read_text(encoding='utf-8'))
-    if set(value) != {'photos', 'book', 'comments'}:
+    if set(value) not in ({'photos', 'book', 'comments'}, {'photos', 'book', 'comments', 'cover'}):
         raise ValueError('Invalid purge journal')
     # Fixed destinations: never trust file paths embedded in a journal.
+    if value.get('cover') is not None and cover_file is None:
+        raise ValueError('Cover destination required for prepared purge')
     atomic_write(comments_file, value['comments'])
     if value['book'] is not None:
         atomic_write(book_file, value['book'])
+    if value.get('cover') is not None:
+        atomic_write(cover_file, value['cover'])
     atomic_write(photos_file, value['photos'])
     journal.unlink()
 
 
 def commit(photos_file: Path, book_file: Path, comments_file: Path,
-           photos: dict, book: dict | None, comments: list) -> None:
+           photos: dict, book: dict | None, comments: list,
+           cover_file: Path | None = None, cover: dict | None = None) -> None:
     """Durable intent before touching any of the three metadata files."""
     atomic_write(photos_file.with_suffix('.purge-journal.json'),
-                 {'photos': photos, 'book': book, 'comments': comments})
-    recover(photos_file, book_file, comments_file)
+                 {'photos': photos, 'book': book, 'comments': comments, 'cover': cover})
+    recover(photos_file, book_file, comments_file, cover_file)
