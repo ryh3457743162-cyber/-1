@@ -18,6 +18,8 @@ class OssIntegrationTest(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory(dir=self.site.BASE_DIR)
         root = Path(self.temp.name)
         self.previous = (self.site.DATA_FILE, self.site.BOOK_LAYOUT_FILE, self.site.UPLOAD_DIR)
+        self.previous_comments = self.site.comment_store.DATA_FILE, self.site.comment_store.LOCK_FILE
+        self.site.comment_store.DATA_FILE, self.site.comment_store.LOCK_FILE = root / 'comments.json', root / 'comments.lock'
         self.site.DATA_FILE = root / "photos.json"
         self.site.BOOK_LAYOUT_FILE = root / "book-layout.json"
         self.site.UPLOAD_DIR = root / "uploads"
@@ -48,6 +50,7 @@ class OssIntegrationTest(unittest.TestCase):
             active.stop()
         self.env.stop()
         self.site.DATA_FILE, self.site.BOOK_LAYOUT_FILE, self.site.UPLOAD_DIR = self.previous
+        self.site.comment_store.DATA_FILE, self.site.comment_store.LOCK_FILE = self.previous_comments
         self.temp.cleanup()
 
     def put(self, key, content, content_type):
@@ -85,10 +88,14 @@ class OssIntegrationTest(unittest.TestCase):
         ]}], "2027": []}}
         self.assertEqual(self.client.put("/api/manage/book-layout", json=layout).status_code, 200)
         self.assertEqual(self.client.delete("/api/manage/photos/" + photo["id"]).status_code, 200)
+        self.assertEqual(len(self.objects), 2)
+        self.assertTrue(self.site.read_data()["photos"][0]["deletedAt"])
+        self.assertEqual(self.client.get("/api/book-layout").json["years"]["2026"][0]["photos"][0]["photoId"], photo["id"])
+        self.assertEqual(self.client.delete("/api/manage/trash/photos/" + photo["id"]).status_code, 200)
         self.assertEqual(len(self.objects), 0)
         self.assertEqual(self.site.read_data()["photos"], [])
         self.assertEqual(self.site.read_data()["pendingOssDeletes"], [])
-        self.assertEqual(self.client.get("/api/book-layout").json["years"]["2026"][0]["photos"][0]["photoId"], photo["id"])
+        self.assertEqual(self.client.get("/api/book-layout").json["years"]["2026"][0]["photos"], [])
 
     def test_thumbnail_failure_rolls_back_uploaded_original(self):
         original_put = self.site.oss_storage.put.side_effect

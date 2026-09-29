@@ -129,7 +129,7 @@
 <body>
   <main class="shell">
     <section class="surface login" id="login">
-      <h1>照片管理</h1><p class="muted">登录后可以发布或删除照片。</p>
+      <h1>照片管理</h1><p class="muted">登录后可以发布或移到回收站。</p>
       <input id="password" type="password" autocomplete="current-password" placeholder="管理密码" aria-label="管理密码">
       <button class="primary" id="login-button" type="button">登录</button>
       <p class="status error" id="login-status" role="alert"></p>
@@ -137,7 +137,7 @@
     <section id="panel" hidden>
       <header class="top">
         <div class="brand"><h1>凡凡and涵涵</h1><p>照片管理</p></div>
-        <nav class="top-actions" aria-label="后台导航"><a href="/manage" aria-current="page">照片管理</a><a href="/admin/book">书本排版</a><a href="/admin/music">音乐管理</a><a href="/admin/comments">评论管理</a><a class="site-link" href="/" target="_blank" rel="noopener">查看网站 <span aria-hidden="true">↗</span></a><button class="logout" id="logout" type="button">退出</button></nav>
+        <nav class="top-actions" aria-label="后台导航"><a href="/manage" aria-current="page">照片管理</a><a href="/admin/book">书本排版</a><a href="/admin/music">音乐管理</a><a href="/admin/comments">评论管理</a><a href="/admin/trash">回收站</a><a class="site-link" href="/" target="_blank" rel="noopener">查看网站 <span aria-hidden="true">↗</span></a><button class="logout" id="logout" type="button">退出</button></nav>
       </header>
       <section class="surface upload-panel" aria-labelledby="upload-title">
         <div class="section-heading"><h2 id="upload-title">发布照片</h2><p>把新的回忆收藏进年轮。</p></div>
@@ -164,7 +164,7 @@
           </div>
           <div class="toolbar-right"><input class="search" id="search" type="search" placeholder="搜索照片" aria-label="搜索照片"><button class="quiet-action" id="batch-toggle" type="button">批量管理</button></div>
         </div>
-        <div class="batch-actions" id="batch-actions" hidden><strong id="selected-count">已选择 0 张</strong><button id="clear-selection" type="button">取消选择</button><button class="danger" id="batch-delete" type="button" disabled>删除 0 张</button></div>
+        <div class="batch-actions" id="batch-actions" hidden><strong id="selected-count">已选择 0 张</strong><button id="clear-selection" type="button">取消选择</button><button class="danger" id="batch-delete" type="button" disabled>移到回收站 0 张</button></div>
         <p class="empty-state" id="empty-state" hidden></p>
         <div class="grid" id="grid"></div>
         <button class="load-more" id="load-more" type="button" hidden>加载更多</button>
@@ -173,7 +173,7 @@
   </main>
   <div class="modal" id="delete-modal" role="dialog" aria-modal="true" aria-labelledby="delete-title" hidden>
     <div class="modal-backdrop" id="modal-backdrop"></div>
-    <div class="modal-dialog"><h2 id="delete-title">删除照片？</h2><p id="delete-message">删除后将无法恢复。</p><div class="modal-actions"><button class="modal-cancel" id="cancel-delete" type="button">取消</button><button class="modal-confirm" id="confirm-delete" type="button">删除</button></div></div>
+    <div class="modal-dialog"><h2 id="delete-title">移到回收站？</h2><p id="delete-message">照片可以从回收站恢复，原图和相关留言暂时不会删除。</p><div class="modal-actions"><button class="modal-cancel" id="cancel-delete" type="button">取消</button><button class="modal-confirm" id="confirm-delete" type="button">移到回收站</button></div></div>
   </div>
   <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
   <script>
@@ -368,7 +368,7 @@
         const remove = document.createElement('button');
         remove.type = 'button';
         remove.setAttribute('role', 'menuitem');
-        remove.textContent = '删除照片';
+        remove.textContent = '移到回收站';
         remove.addEventListener('click', () => { closeMenus(); openDelete([String(photo.id)]); });
         menu.append(remove);
         action.addEventListener('click', event => {
@@ -412,7 +412,7 @@
     function updateBatchActions() {
       const count = selectedIds.size;
       $('#selected-count').textContent = '已选择 ' + count + ' 张';
-      $('#batch-delete').textContent = '删除 ' + count + ' 张';
+      $('#batch-delete').textContent = '移到回收站 ' + count + ' 张';
       $('#batch-delete').disabled = !count || deleteBusy;
     }
     function openDelete(ids) {
@@ -422,9 +422,9 @@
         ? document.activeElement.closest('.photo').querySelector('.photo-action')
         : document.activeElement;
       $('#delete-message').textContent = ids.length === 1
-        ? '删除后将无法恢复。'
-        : '选中的 ' + ids.length + ' 张照片删除后将无法恢复。';
-      $('#confirm-delete').textContent = ids.length === 1 ? '删除' : '删除 ' + ids.length + ' 张';
+        ? '照片可以从回收站恢复，原图和相关留言暂时不会删除。'
+        : '选中的 ' + ids.length + ' 张照片可以从回收站恢复，原图和相关留言暂时不会删除。';
+      $('#confirm-delete').textContent = ids.length === 1 ? '移到回收站' : '移到回收站 ' + ids.length + ' 张';
       $('#delete-modal').hidden = false;
       document.body.classList.add('modal-open');
       $('#cancel-delete').focus();
@@ -443,7 +443,7 @@
       const confirm = $('#confirm-delete');
       confirm.disabled = true;
       $('#cancel-delete').disabled = true;
-      confirm.textContent = '正在删除...';
+      confirm.textContent = '正在移入...';
       let deleted = 0, failure = null;
       for (const id of ids) {
         try {
@@ -461,8 +461,8 @@
       $('#cancel-delete').disabled = false;
       closeDelete();
       renderGrid();
-      if (deleted) showToast(deleted + ' 张照片已删除，公开页面刷新后同步');
-      if (failure) showToast(deleted ? '部分照片删除失败：' + failure.message : failure.message, true);
+      if (deleted) showToast(deleted + ' 张照片已移到回收站，公开页面刷新后同步');
+      if (failure) showToast(deleted ? '部分照片未能移入回收站：' + failure.message : failure.message, true);
     }
 
     $('#login-button').addEventListener('click', async () => {

@@ -64,4 +64,6 @@ def exists(key: str) -> bool:
 
 
 def delete(key: str) -> None:
-    _bucket().delete_object(key)
+    result = _bucket().delete_object(key)
+    if result.status not in (200, 204):
+        raise RuntimeError("OSS object deletion failed")

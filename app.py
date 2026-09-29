@@ -13,7 +13,7 @@ from datetime import datetime, timezone
 from io import BytesIO
 from pathlib import Path
 
-from flask import Flask, Response, jsonify, request, send_file, send_from_directory, session, stream_with_context
+from flask import Flask, Response, g, jsonify, request, send_file, send_from_directory, session, stream_with_context
 from PIL import Image, ImageOps
 from pillow_heif import register_heif_opener
 from werkzeug.security import check_password_hash
@@ -21,6 +21,7 @@ from werkzeug.utils import secure_filename
 import oss_storage
 import music_store
 import comment_store
+import photo_lifecycle
 
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -90,16 +91,13 @@ def read_data() -> dict:
         value.setdefault("hiddenSeedIds", [])
         value.setdefault("pendingOssDeletes", [])
         value.setdefault("seedOss", {})
+        value.setdefault("seedStates", {})
         return value
 
 
 def write_data(value: dict) -> None:
     with data_lock:
-        temporary = DATA_FILE.with_suffix(".tmp")
-        temporary.write_text(
-            json.dumps(value, ensure_ascii=False, indent=2), encoding="utf-8"
-        )
-        temporary.replace(DATA_FILE)
+        photo_lifecycle.atomic_write(DATA_FILE, value)
 
 
 def read_book_layout() -> dict:
@@ -194,6 +192,64 @@ def admin_required(function):
     return wrapped
 
 
+@app.before_request
+def lock_photo_lifecycle():
+    if request.path.startswith(("/api/photos", "/api/images/", "/api/thumbnails/", "/photos/",
+                                "/api/book-layout", "/api/manage/photos", "/api/manage/trash",
+                                "/api/manage/upload", "/api/manage/book-layout", "/api/manage/comments",
+                                "/api/manage/oss/retry-deletes")):
+        guard = photo_lifecycle.locked(DATA_FILE)
+        try:
+            guard.__enter__()
+            g.photo_guard = guard
+            photo_lifecycle.recover(DATA_FILE, BOOK_LAYOUT_FILE, comment_store.DATA_FILE)
+        except Exception:
+            app.logger.error("Photo metadata temporarily unavailable")
+            return jsonify({"error": "照片数据暂时不可用，请稍后重试"}), 503
+
+
+@app.teardown_request
+def unlock_photo_lifecycle(_error):
+    guard = g.pop("photo_guard", None)
+    if guard is not None:
+        guard.__exit__(None, None, None)
+
+
+def all_photo_records(data: dict) -> list[dict]:
+    seeds = []
+    for index in range(1, 32):
+        photo_id = f"seed-{index:02d}"
+        state = data["seedStates"].get(photo_id, {})
+        storage = data["seedOss"].get(photo_id, {})
+        if photo_id in data["hiddenSeedIds"] and not state.get("deletedAt"):
+            continue  # Legacy hidden photos are not silently restored or reclassified.
+        if not (PUBLIC_DIR / "photos" / f"photo-{index:02d}.jpg").is_file() and not storage.get("objectKey") and not state.get("deletedAt"):
+            continue
+        seeds.append({"id": photo_id, "title": f"和宝宝的记忆 · {index:02d}", "year": "2026",
+                      "src": f"/photos/photo-{index:02d}.jpg", "builtin": True,
+                      **storage, **state,
+                      **({"thumbnailSrc": f"/api/thumbnails/{photo_id}"} if storage.get("thumbnailKey") else {})})
+    return seeds + data["photos"]
+
+
+def public_photo_ids(data: dict) -> set[str]:
+    return {item["id"] for item in all_photo_records(data) if not item.get("deletedAt")}
+
+
+def photo_record(data: dict, photo_id: str) -> dict | None:
+    return next((item for item in all_photo_records(data) if item["id"] == photo_id), None)
+
+
+def image_available(photo_id: str) -> bool:
+    item = photo_record(read_data(), photo_id)
+    return bool(item and (not item.get("deletedAt") or is_admin()))
+
+
+@app.get("/admin/trash")
+def manage_trash_page():
+    return send_from_directory(PUBLIC_DIR, "trash-admin.html")
+
+
 @app.after_request
 def security_headers(response):
     response.headers["X-Content-Type-Options"] = "nosniff"
@@ -201,8 +257,8 @@ def security_headers(response):
     response.headers["Referrer-Policy"] = "same-origin"
     if request.path.startswith("/api/music/stream/"):
         response.headers["Cache-Control"] = "private, max-age=3600"
-    elif request.path.startswith(("/api/images/", "/api/thumbnails/")):
-        response.headers["Cache-Control"] = "public, max-age=3600"
+    elif request.path.startswith(("/api/images/", "/api/thumbnails/", "/photos/")):
+        response.headers["Cache-Control"] = "private, no-cache" if response.status_code < 400 else "no-store"
     else:
         response.headers["Cache-Control"] = (
             "no-store" if request.path.startswith("/api/") else "public, max-age=300"
@@ -248,6 +304,8 @@ def book_layout_script():
 @app.get("/photos/<path:name>")
 def seed_image(name: str):
     match = re.fullmatch(r"photo-(\d{2})\.jpg", name)
+    if not match or not image_available(f"seed-{match.group(1)}"):
+        return jsonify({"error": "照片不存在"}), 404
     if match and os.environ.get("PHOTO_RING_LEGACY_FIRST") != "1":
         photo_id = f"seed-{match.group(1)}"
         entry = read_data()["seedOss"].get(photo_id, {})
@@ -261,6 +319,8 @@ def seed_image(name: str):
 
 @app.get("/api/images/<path:name>")
 def uploaded_image(name: str):
+    if not image_available(name):
+        return jsonify({"error": "照片不存在"}), 404
     photo = next((item for item in read_data()["photos"] if item.get("id") == name), None)
     if photo and photo.get("objectKey") and os.environ.get("PHOTO_RING_LEGACY_FIRST") != "1":
         try:
@@ -274,6 +334,8 @@ def uploaded_image(name: str):
 
 @app.get("/api/thumbnails/<path:name>")
 def uploaded_thumbnail(name: str):
+    if not image_available(name):
+        return jsonify({"error": "照片不存在"}), 404
     data = read_data()
     photo = next((item for item in data["photos"] if item.get("id") == name), None)
     seed = data["seedOss"].get(name, {}) if name in SEED_IDS else {}
@@ -295,16 +357,17 @@ def uploaded_thumbnail(name: str):
 @app.get("/api/photos")
 def photos():
     data = read_data()
+    active_ids = public_photo_ids(data)
     counts = {}
     for comment in readable_public_comments():
-        if comment.get("status") == "approved":
+        if comment.get("status") == "approved" and comment.get("photoId") in active_ids:
             photo_id = comment.get("photoId")
             counts[photo_id] = counts.get(photo_id, 0) + 1
     public_fields = {"id", "title", "year", "src", "thumbnailSrc", "uploaded", "width", "height"}
     return jsonify({
         "photos": [{**{key: value for key, value in item.items() if key in public_fields},
-                    "commentCount": counts.get(item["id"], 0)} for item in data["photos"]],
-        "hiddenSeedIds": data["hiddenSeedIds"],
+                    "commentCount": counts.get(item["id"], 0)} for item in data["photos"] if item["id"] in active_ids],
+        "hiddenSeedIds": sorted(SEED_IDS - active_ids),
         "commentCounts": counts,
     })
 
@@ -312,10 +375,12 @@ def photos():
 @app.get("/api/book-layout")
 def book_layout():
     layout = read_book_layout()
+    active_ids = public_photo_ids(read_data())
     ids = {page.get("note", {}).get("commentId") for pages in layout["years"].values()
            for page in pages if isinstance(page, dict) and isinstance(page.get("note"), dict)}
     layout["featuredComments"] = {item["id"]: public_comment(item) for item in readable_public_comments()
-                                  if item.get("id") in ids and item.get("status") == "approved"}
+                                  if item.get("id") in ids and item.get("status") == "approved"
+                                  and item.get("photoId") in active_ids}
     return jsonify(layout)
 
 
@@ -348,10 +413,7 @@ def visitor_hash(create: bool = False) -> str | None:
 
 
 def photo_is_public(photo_id: str) -> bool:
-    data = read_data()
-    if photo_id in SEED_IDS:
-        return photo_id not in data["hiddenSeedIds"] and (PUBLIC_DIR / "photos" / f"photo-{photo_id[5:]}.jpg").is_file()
-    return any(item.get("id") == photo_id for item in data["photos"])
+    return photo_id in public_photo_ids(read_data())
 
 
 @app.get("/api/photos/<photo_id>/comments")
@@ -731,9 +793,15 @@ def save_book_layout():
         return jsonify({"error": str(error)}), 400
     old_pages = {page.get("id"): page for pages in read_book_layout()["years"].values()
                  for page in pages if isinstance(page, dict)}
-    approved_ids = {item["id"] for item in comment_store.read() if item.get("status") == "approved"}
+    active_ids = public_photo_ids(read_data())
+    approved_ids = {item["id"] for item in comment_store.read() if item.get("status") == "approved"
+                    and item.get("photoId") in active_ids}
     for pages in value["years"].values():
         for page in pages:
+            old_refs = {(ref["photoId"], ref["slot"]) for ref in old_pages.get(page["id"], {}).get("photos", [])}
+            if any(ref["photoId"] not in active_ids and (ref["photoId"], ref["slot"]) not in old_refs
+                   for ref in page["photos"]):
+                return jsonify({"error": "照片已不可用，请刷新排版后重试"}), 409
             note = page.get("note", {})
             if note.get("type") != "comment":
                 continue
@@ -774,25 +842,11 @@ def logout():
 @admin_required
 def manage_photos():
     data = read_data()
-    hidden = set(data["hiddenSeedIds"])
-    seed_photos = []
-    for index in range(1, 32):
-        photo_id = f"seed-{index:02d}"
-        filename = f"photo-{index:02d}.jpg"
-        if photo_id in hidden or not (PUBLIC_DIR / "photos" / filename).exists():
-            continue
-        seed_photos.append(
-            {
-                "id": photo_id,
-                "title": f"和宝宝的记忆 · {index:02d}",
-                "year": "2026",
-                "src": f"/photos/{filename}",
-                "builtin": True,
-                **({"thumbnailSrc": f"/api/thumbnails/{photo_id}"}
-                   if data["seedOss"].get(photo_id, {}).get("thumbnailKey") else {}),
-            }
-        )
-    return jsonify({"photos": seed_photos + data["photos"]})
+    items = all_photo_records(data)
+    include_trash = request.args.get("includeTrash") == "1"
+    fields = {"id", "title", "year", "src", "thumbnailSrc", "builtin", "uploaded", "deletedAt", "purgeStartedAt"}
+    return jsonify({"photos": [{key: value for key, value in item.items() if key in fields}
+                               for item in items if include_trash or not item.get("deletedAt")]})
 
 
 def save_image(file_storage) -> tuple[str, str]:
@@ -952,6 +1006,8 @@ def upload():
         with data_lock:
             data = read_data()
             data["photos"].extend(saved)
+            for item in saved:
+                item.setdefault("deletedAt", None)
             write_data(data)
     except Exception:
         app.logger.exception("Photo metadata write failed")
@@ -966,41 +1022,127 @@ def upload():
 @app.delete("/api/manage/photos/<photo_id>")
 @admin_required
 def delete_photo(photo_id: str):
-    with data_lock:
-        data = read_data()
-        if photo_id in SEED_IDS:
-            hidden = set(data["hiddenSeedIds"])
-            hidden.add(photo_id)
-            data["hiddenSeedIds"] = sorted(hidden)
-            write_data(data)
-            return jsonify({"ok": True})
-
-        target = next((item for item in data["photos"] if item.get("id") == photo_id), None)
-        original_count = len(data["photos"])
-        data["photos"] = [item for item in data["photos"] if item.get("id") != photo_id]
-        if len(data["photos"]) == original_count:
-            return jsonify({"error": "没有找到这张照片"}), 404
-        keys = [key for key in (target.get("objectKey"), target.get("thumbnailKey")) if key]
-        data["pendingOssDeletes"].extend(keys)
+    data = read_data()
+    target = photo_record(data, photo_id)
+    if not target:
+        return jsonify({"error": "没有找到这张照片"}), 404
+    state = data["seedStates"].setdefault(photo_id, {}) if photo_id in SEED_IDS else target
+    if not state.get("deletedAt"):
+        state["deletedAt"] = datetime.now(timezone.utc).isoformat()
         write_data(data)
-        if not keys:
-            (UPLOAD_DIR / Path(photo_id).name).unlink(missing_ok=True)
-            return jsonify({"ok": True})
-    failed = delete_oss_keys(keys)
-    if len(failed) != len(keys):
-        with data_lock:
-            data = read_data()
+    return jsonify({"ok": True})
+
+
+@app.get("/api/manage/trash/photos")
+@admin_required
+def trash_photos():
+    items = [item for item in all_photo_records(read_data()) if item.get("deletedAt")]
+    items.sort(key=lambda item: (item["deletedAt"], item["id"]), reverse=True)
+    comments = comment_store.read()
+    counts = {}
+    for item in comments:
+        counts[item["photoId"]] = counts.get(item["photoId"], 0) + 1
+    refs = {ref["photoId"] for pages in read_book_layout()["years"].values()
+            for page in pages for ref in page.get("photos", [])}
+    fields = {"id", "title", "year", "src", "thumbnailSrc", "builtin", "deletedAt", "purgeStartedAt"}
+    return jsonify({"photos": [{**{key: value for key, value in item.items() if key in fields},
+                                "commentTotal": counts.get(item["id"], 0), "bookReferenced": item["id"] in refs}
+                               for item in items], "total": len(items)})
+
+
+@app.post("/api/manage/photos/<photo_id>/restore")
+@admin_required
+def restore_photo(photo_id: str):
+    data = read_data()
+    target = photo_record(data, photo_id)
+    if not target:
+        return jsonify({"error": "没有找到这张照片"}), 404
+    if target.get("purgeStartedAt"):
+        return jsonify({"error": "永久清理已开始，部分资源可能已删除，请重试永久删除"}), 409
+    state = data["seedStates"].get(photo_id, {}) if photo_id in SEED_IDS else target
+    state["deletedAt"] = None
+    write_data(data)
+    return jsonify({"ok": True})
+
+
+@app.delete("/api/manage/trash/photos/<photo_id>")
+@admin_required
+def purge_photo(photo_id: str):
+    data = read_data()
+    target = photo_record(data, photo_id)
+    if not target:
+        return jsonify({"error": "没有找到这张照片"}), 404
+    if not target.get("deletedAt"):
+        return jsonify({"error": "请先将照片移到回收站"}), 409
+    keys = list(dict.fromkeys(key for key in (target.get("objectKey"), target.get("thumbnailKey")) if key))
+    # Check all mappings, including legacy hidden seeds, before deleting a key.
+    other_records = [item for item in data["photos"] if item["id"] != photo_id]
+    other_records += [item for key, item in data["seedOss"].items() if key != photo_id]
+    shared = {item.get(field) for item in other_records for field in ("objectKey", "thumbnailKey")}
+    if any(not isinstance(key, str) or not re.fullmatch(r'photos/(originals|thumbnails)/(2026|2027)/[A-Za-z0-9_.-]+', key)
+           or key in shared or key in data["pendingOssDeletes"] for key in keys):
+        app.logger.error("Photo purge blocked: unsafe or shared resource photoId=%s", photo_id)
+        return jsonify({"error": "照片资源关联需要人工核查，未执行永久删除"}), 409
+    base = PUBLIC_DIR / "photos" if photo_id in SEED_IDS else UPLOAD_DIR
+    local = base / (f"photo-{photo_id[5:]}.jpg" if photo_id in SEED_IDS else photo_id)
+    if local.parent.resolve() != base.resolve() or local.is_symlink():
+        return jsonify({"error": "照片文件路径需要人工核查"}), 409
+    # Prepare/validate every JSON relationship before irreversible resource removal.
+    with comment_store._locked():
+        try:
+            comments = comment_store.read()
+            removed_ids = {item["id"] for item in comments if item.get("photoId") == photo_id}
+            remaining = [item for item in comments if item.get("photoId") != photo_id]
+            book = None
+            if BOOK_LAYOUT_FILE.exists():
+                book = json.loads(BOOK_LAYOUT_FILE.read_text(encoding="utf-8"))
+                for pages in book["years"].values():
+                    for page in pages:
+                        # Empty slots are represented by absence from photos[], preserving page/slot numbering.
+                        page["photos"] = [ref for ref in page.get("photos", []) if ref.get("photoId") != photo_id]
+                        if page.get("note", {}).get("type") == "comment" and page["note"].get("commentId") in removed_ids:
+                            page.pop("note")
+        except (ValueError, KeyError, TypeError, AttributeError):
+            app.logger.error("Photo purge blocked: invalid relationship metadata photoId=%s", photo_id)
+            return jsonify({"error": "照片关联数据需要人工核查，未执行永久删除"}), 409
+        state = data["seedStates"].setdefault(photo_id, {}) if photo_id in SEED_IDS else target
+        try:
+            if not state.get("purgeStartedAt"):
+                state["purgeStartedAt"] = datetime.now(timezone.utc).isoformat()
+                state["purgeCompletedKeys"] = []
+                write_data(data)  # Durable retry identity before deleting the first object.
             for key in keys:
-                if key not in failed and key in data["pendingOssDeletes"]:
-                    data["pendingOssDeletes"].remove(key)
-            write_data(data)
-    return jsonify({"ok": True, "cleanupPending": bool(failed)})
+                if key in state["purgeCompletedKeys"]:
+                    continue
+                try:
+                    oss_storage.delete(key)
+                except Exception as error:
+                    if getattr(error, "code", None) != "NoSuchKey":
+                        raise
+                state["purgeCompletedKeys"].append(key)
+                write_data(data)
+            local.unlink(missing_ok=True)
+            if photo_id in SEED_IDS:
+                data["seedStates"].pop(photo_id, None)
+                data["seedOss"].pop(photo_id, None)
+                data["hiddenSeedIds"] = sorted(set(data["hiddenSeedIds"]) | {photo_id})
+            else:
+                data["photos"] = [item for item in data["photos"] if item["id"] != photo_id]
+            photo_lifecycle.commit(DATA_FILE, BOOK_LAYOUT_FILE, comment_store.DATA_FILE, data, book, remaining)
+        except Exception as error:
+            app.logger.error("Photo purge incomplete photoId=%s result=retry-required errorType=%s", photo_id, type(error).__name__)
+            return jsonify({"error": "永久删除未完成，记录和清理进度已保留，请重试。此照片暂不能恢复。"}), 502
+    app.logger.info("Photo purge completed photoId=%s result=success", photo_id)
+    return jsonify({"ok": True})
 
 
 @app.post("/api/manage/oss/retry-deletes")
 @admin_required
 def retry_oss_deletes():
-    keys = list(read_data()["pendingOssDeletes"])
+    snapshot = read_data()
+    referenced = {item.get(field) for item in snapshot["photos"] + list(snapshot["seedOss"].values())
+                  for field in ("objectKey", "thumbnailKey")}
+    keys = [key for key in snapshot["pendingOssDeletes"] if key not in referenced]
     failed = delete_oss_keys(keys)
     if len(failed) != len(keys):
         with data_lock:
@@ -1009,7 +1151,7 @@ def retry_oss_deletes():
                 if key not in failed and key in data["pendingOssDeletes"]:
                     data["pendingOssDeletes"].remove(key)
             write_data(data)
-    return jsonify({"ok": True, "deleted": len(keys) - len(failed), "pending": len(failed)})
+    return jsonify({"ok": True, "deleted": len(keys) - len(failed), "pending": len(read_data()["pendingOssDeletes"])})
 
 
 @app.errorhandler(413)

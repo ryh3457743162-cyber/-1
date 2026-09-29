@@ -60,7 +60,8 @@ class BookLayoutTest(unittest.TestCase):
                 bad["years"]["2026"][0]["layout"] = []
                 self.assertEqual(client.put("/api/manage/book-layout", json=bad).status_code, 400)
                 self.assertEqual(client.delete("/api/manage/photos/" + photo_id).status_code, 200)
-                self.assertFalse((site.UPLOAD_DIR / photo_id).exists())
+                self.assertTrue((site.UPLOAD_DIR / photo_id).exists())
+                self.assertTrue(site.read_data()["photos"][0]["deletedAt"])
                 self.assertEqual(client.get("/api/book-layout").json["years"]["2026"][0]["photos"][0]["photoId"], photo_id)
             finally:
                 site.DATA_FILE, site.BOOK_LAYOUT_FILE, site.UPLOAD_DIR = original_data, original_book, original_upload
