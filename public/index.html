@@ -462,7 +462,7 @@
           const cell=document.createElement('div'),ref=(bookPage.photos||[]).find(item=>item.slot===slot),photo=ref&&byId.get(ref.photoId);
           cell.className='book-layout-slot';cell.style.gridArea=(layout.photoAreas||['a','b','c','d'])[slot-1];
           if(photo){const img=document.createElement('img');loadPreview(img,photo);img.alt=photo.title;img.draggable=false;cell.dataset.photoIndex=String(bookPhotoPositions.get(`${bookPage.id}:${slot}`));cell.append(img);firstPhoto??=photo}
-          else if(ref){cell.classList.add('missing');cell.textContent='照片已移除'}
+          else if(ref){cell.style.visibility='hidden'}
           grid.append(cell);
         }
         {
