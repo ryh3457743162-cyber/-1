@@ -1,0 +1,12 @@
+[Unit]
+Description=Daily anonymous analytics retention maintenance
+
+[Timer]
+# 04:10 Beijing time; cleanup itself computes retention dates in Asia/Shanghai.
+OnCalendar=*-*-* 20:10:00 UTC
+RandomizedDelaySec=10m
+Persistent=true
+Unit=photo-ring-analytics-cleanup.service
+
+[Install]
+WantedBy=timers.target

@@ -23,6 +23,7 @@ import music_store
 import comment_store
 import photo_lifecycle
 import book_cover_store
+import analytics_routes
 
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -191,6 +192,9 @@ def admin_required(function):
 
     wrapped.__name__ = function.__name__
     return wrapped
+
+
+analytics_routes.register_analytics(app, BASE_DIR, lambda: PUBLIC_DIR, admin_required, is_admin)
 
 
 @app.before_request

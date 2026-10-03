@@ -1,0 +1,15 @@
+[Unit]
+Description=ZMF&RYH anonymous analytics retention cleanup
+
+[Service]
+Type=oneshot
+User=photo-ring
+Group=photo-ring
+WorkingDirectory=/opt/photo-ring
+ExecCondition=/usr/bin/test -f /opt/photo-ring/data/analytics.sqlite3
+ExecStart=/opt/photo-ring/venv/bin/python scripts/analytics_maintenance.py cleanup --database /opt/photo-ring/data/analytics.sqlite3
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/opt/photo-ring/data
+UMask=0077

@@ -328,6 +328,7 @@
       <label for="music-volume">音量 <input id="music-volume" type="range" min="0" max="100" step="1" value="30" aria-label="音乐音量"></label>
     </div>
   </div>
+  <script src="/analytics.js?v=1"></script>
   <script src="/photo-metadata.js?v=1"></script>
   <script src="/book-cover.js?v=cover-v1"></script>
   <script src="book-layouts.js?v=note-stack-20260926"></script>
@@ -346,6 +347,7 @@
       siteShell.inert=true;
       introCover.inert=false;introCover.setAttribute('aria-hidden','false');
       document.documentElement.classList.add('story-cover-open');
+      window.SiteAnalytics?.view('startup');
       setTimeout(()=>{if(document.documentElement.classList.contains('story-cover-open'))enterStoryButton.focus({preventScroll:true})},520);
     }
     function enterStory(){
@@ -353,6 +355,7 @@
       siteShell.inert=false;introCover.inert=true;introCover.setAttribute('aria-hidden','true');
       document.documentElement.classList.remove('story-cover-open');
       renderAlbumCover();
+      window.SiteAnalytics?.view(view);
       openCoverButton.focus({preventScroll:true});
     }
     openCoverButton.addEventListener('click',showCover);
@@ -657,7 +660,7 @@
     function updateStoryNav(index){const count=photos.length;if(!count){$('#moment-prev-label').textContent='—';$('#moment-current-label').textContent='00';$('#moment-next-label').textContent='—';return}const label=i=>String(wrap(i,count)+1).padStart(2,'0');$('#moment-prev-label').textContent=label(index-1);$('#moment-current-label').textContent=label(index);$('#moment-next-label').textContent=label(index+1)}
     function animate(t){const ms=last?Math.min(t-last,50):16;last=t;if(render(false,ms))frame=requestAnimationFrame(animate);else{frame=0;last=0;if(Math.abs(position)>photos.length*10){const laps=Math.trunc(position/photos.length)*photos.length;position-=laps;target-=laps;}}}
     function wake(){if(!frame)frame=requestAnimationFrame(animate)}
-    function switchView(v){view=v;stage.dataset.view=v;setYear(selectedYear,true);document.body.classList.toggle('book-mode',v==='book');if(v!=='book'&&scrollY)scrollTo(0,0);bookReader.hidden=v!=='book';bookObject.hidden=!bookPages.length;$('#book-controls').hidden=!bookPages.length;empty.hidden=(v==='book'?bookPages.length:photos.length)>0;empty.querySelector('h2').textContent=v==='book'?'书本尚未排版':'让照片围成一圈';$('#empty-message').textContent=v==='book'&&!bookPages.length?'这个年份的书本还没有页面。':`这个年份暂时没有照片，请切换到 ${selectedYear==='2026'?'2027':'2026'} 年。`;list.setAttribute('aria-hidden',String(v==='book'));document.querySelectorAll('.views [data-view]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.view===v)));if(v==='book')showAlbumCover();else{clearTimeout(albumCoverTimer);albumCoverOpening=false;stopBookTurn();applyAlbumVisibility()}render(true);wake()}
+    function switchView(v){view=v;stage.dataset.view=v;setYear(selectedYear,true);document.body.classList.toggle('book-mode',v==='book');if(v!=='book'&&scrollY)scrollTo(0,0);bookReader.hidden=v!=='book';bookObject.hidden=!bookPages.length;$('#book-controls').hidden=!bookPages.length;empty.hidden=(v==='book'?bookPages.length:photos.length)>0;empty.querySelector('h2').textContent=v==='book'?'书本尚未排版':'让照片围成一圈';$('#empty-message').textContent=v==='book'&&!bookPages.length?'这个年份的书本还没有页面。':`这个年份暂时没有照片，请切换到 ${selectedYear==='2026'?'2027':'2026'} 年。`;list.setAttribute('aria-hidden',String(v==='book'));document.querySelectorAll('.views [data-view]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.view===v)));if(v==='book')showAlbumCover();else{clearTimeout(albumCoverTimer);albumCoverOpening=false;stopBookTurn();applyAlbumVisibility()}render(true);wake();if(!document.documentElement.classList.contains('story-cover-open'))window.SiteAnalytics?.view(v)}
     document.querySelectorAll('.views [data-view]').forEach(b=>b.addEventListener('click',()=>switchView(b.dataset.view)));
     for(const id of ['year','prev-year','next-year'])$("#"+id).addEventListener('click',()=>setYear(adjacentYear(id==='prev-year'?-1:1)));
     document.querySelectorAll('.book-year').forEach(button=>button.addEventListener('click',()=>setYear(button.dataset.year)));
@@ -762,6 +765,7 @@
         setYear(selectedYear,true);
       }catch{bookLayoutConfigured=false;deriveBookPages();if(view==='book')build()}
     }
+    window.SiteAnalytics?.view(coverOpen?'startup':view);
     const previewYear=new URLSearchParams(location.search).get('bookYear');
     window.addEventListener('resize',()=>{stopBookTurn();render(true)});reduced.addEventListener('change',()=>{if(reduced.matches)stopBookTurn();render(true)});setYear(previewYear==='2027'?'2027':'2026');Promise.all([loadPublishedPhotos(),loadBookLayout(),loadAlbumCover()]);
     document.addEventListener('visibilitychange',()=>{if(!document.hidden){loadPublishedPhotos();loadBookLayout()}});
