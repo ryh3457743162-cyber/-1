@@ -115,6 +115,15 @@
     .modal-cancel{border:1px solid var(--line);background:#fff;color:#5f5852}
     .modal-confirm{border:1px solid var(--wine);background:var(--wine);color:#fff}
     .modal-confirm:not(:disabled):hover{background:var(--wine-deep)}
+    .edit-dialog{max-height:calc(100dvh - 40px);overflow:auto}
+    .edit-preview{display:block;width:100%;height:145px;object-fit:contain;margin:18px 0;background:#f3eee7;border-radius:10px}
+    .edit-dialog label{display:block;margin:14px 0 6px;color:#665b54;font-size:13px}
+    .edit-dialog input{width:100%;min-width:0;min-height:42px;box-sizing:border-box}
+    .edit-dialog input:focus{outline:2px solid #b4848b55;outline-offset:1px}
+    .edit-dialog .edit-help{margin:6px 0;color:#8c8178;font-size:11px}
+    .edit-dialog .edit-error{margin:12px 0;color:var(--wine-deep);font-size:12px}
+    .edit-dialog .modal-actions{margin-top:18px}
+    .edit-info{margin-top:9px;padding:5px 0;border:0;background:transparent;color:var(--wine-deep);font-size:12px}
     .toast{position:fixed;right:24px;bottom:24px;z-index:110;max-width:min(390px,calc(100vw - 32px));padding:12px 17px;border-radius:11px;background:#524842;color:#fff;font-size:12px;line-height:1.5;box-shadow:0 9px 25px #24181525;animation:toastIn .2s var(--ease)}
     .toast.error{background:var(--wine-deep)}
     @keyframes modalIn{from{opacity:0;transform:translateY(9px)}to{opacity:1;transform:translateY(0)}}
@@ -176,6 +185,19 @@
     <div class="modal-dialog"><h2 id="delete-title">移到回收站？</h2><p id="delete-message">照片可以从回收站恢复，原图和相关留言暂时不会删除。</p><div class="modal-actions"><button class="modal-cancel" id="cancel-delete" type="button">取消</button><button class="modal-confirm" id="confirm-delete" type="button">移到回收站</button></div></div>
   </div>
   <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+  <div class="modal" id="edit-modal" role="dialog" aria-modal="true" aria-labelledby="edit-heading" hidden>
+    <div class="modal-backdrop" id="edit-backdrop"></div>
+    <form class="modal-dialog edit-dialog" id="edit-form">
+      <h2 id="edit-heading">编辑照片信息</h2>
+      <img class="edit-preview" id="edit-preview" alt="当前照片">
+      <label for="edit-title">照片名称</label><input id="edit-title" required maxlength="60" autocomplete="off">
+      <label for="edit-date">拍摄日期</label><input id="edit-date" type="date" min="0001-01-01" max="9999-12-31">
+      <p class="edit-help">日期未知时可以清空。不会改变书本排版或归档年份。</p>
+      <label for="edit-uploaded">上传时间</label><input id="edit-uploaded" readonly>
+      <p class="edit-error" id="edit-error" role="alert" hidden></p>
+      <div class="modal-actions"><button class="modal-cancel" id="cancel-edit" type="button">取消</button><button class="modal-confirm" id="save-edit" type="submit">保存修改</button></div>
+    </form>
+  </div>
   <script>
     const $ = selector => document.querySelector(selector);
     const login = $('#login'), panel = $('#panel'), grid = $('#grid');
@@ -185,6 +207,68 @@
     let activeYear = ['2026', '2027'].includes(String(new Date().getFullYear())) ? String(new Date().getFullYear()) : '2026';
     let batchMode = false, visibleLimit = 72, uploadBusy = false, deleteBusy = false;
     let pendingDeleteIds = [], previousFocus = null, toastTimer = null;
+    let editPhotoId = null, editBusy = false, editFocus = null;
+
+    function openEdit(photo) {
+      if (editBusy || photo.deletedAt) return;
+      editFocus = document.activeElement;
+      editPhotoId = String(photo.id);
+      $('#edit-preview').src = photo.thumbnailSrc || photo.src;
+      $('#edit-preview').alt = photo.title || '当前照片';
+      $('#edit-title').value = photo.title || '';
+      $('#edit-date').value = photo.shotDate || '';
+      $('#edit-uploaded').value = photo.uploaded ? new Date(photo.uploaded).toLocaleString('zh-CN') : '历史照片未记录上传时间';
+      $('#edit-error').hidden = true;
+      $('#edit-modal').hidden = false;
+      document.body.classList.add('modal-open');
+      $('#edit-title').focus();
+    }
+    function closeEdit() {
+      if (editBusy) return;
+      $('#edit-modal').hidden = true;
+      document.body.classList.remove('modal-open');
+      editPhotoId = null;
+      if (editFocus?.isConnected) editFocus.focus();
+    }
+    $('#edit-form').addEventListener('submit', async event => {
+      event.preventDefault();
+      if (editBusy || !editPhotoId) return;
+      const title = $('#edit-title').value.trim(), shotDate = $('#edit-date').value || null;
+      if (!title || Array.from(title).length > 60) {
+        $('#edit-error').textContent = '照片名称需为 1–60 个字符';
+        $('#edit-error').hidden = false; return;
+      }
+      editBusy = true;
+      $('#save-edit').textContent = '保存中…';
+      for (const id of ['save-edit', 'cancel-edit', 'edit-title', 'edit-date']) $('#' + id).disabled = true;
+      try {
+        const data = await api('/api/manage/photos/' + encodeURIComponent(editPhotoId), {
+          method: 'PATCH', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({title, shotDate})
+        });
+        const photo = allPhotos.find(item => String(item.id) === editPhotoId);
+        if (photo) Object.assign(photo, data.photo);
+        try { localStorage.setItem('photoRingMetadataUpdated', String(Date.now())); } catch {}
+        editBusy = false; closeEdit(); renderGrid(); showToast('照片信息已更新');
+      } catch (error) {
+        $('#edit-error').textContent = error.message;
+        $('#edit-error').hidden = false;
+      } finally {
+        editBusy = false;
+        for (const id of ['save-edit', 'cancel-edit', 'edit-title', 'edit-date']) $('#' + id).disabled = false;
+        $('#save-edit').textContent = '保存修改';
+      }
+    });
+    $('#cancel-edit').addEventListener('click', closeEdit);
+    $('#edit-backdrop').addEventListener('click', closeEdit);
+    $('#edit-modal').addEventListener('keydown', event => {
+      if (event.key === 'Escape') { event.stopPropagation(); closeEdit(); }
+      if (event.key === 'Tab') {
+        const controls = [...$('#edit-form').querySelectorAll('input:not([disabled]), button:not([disabled])')];
+        const first = controls[0], last = controls.at(-1);
+        if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+        else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+      }
+    });
 
     async function api(url, options = {}) {
       const response = await fetch(url, options);
@@ -390,6 +474,11 @@
         const date = typeof photo.uploaded === 'string' ? photo.uploaded.slice(0, 10).replaceAll('-', '.') : '';
         detail.textContent = String(photo.year) + (date ? ' · ' + date : '');
         info.append(title, detail);
+        const edit = document.createElement('button');
+        edit.type = 'button'; edit.className = 'edit-info'; edit.textContent = '编辑信息';
+        edit.addEventListener('click', () => openEdit(photo));
+        if (photo.shotDate) detail.textContent += ' · 拍摄 ' + photo.shotDate;
+        info.append(edit);
         card.append(media, info);
         card.addEventListener('click', event => {
           if (batchMode && !event.target.closest('button')) toggleSelection(photo.id, card);

@@ -328,6 +328,7 @@
       <label for="music-volume">音量 <input id="music-volume" type="range" min="0" max="100" step="1" value="30" aria-label="音乐音量"></label>
     </div>
   </div>
+  <script src="/photo-metadata.js?v=1"></script>
   <script src="/book-cover.js?v=cover-v1"></script>
   <script src="book-layouts.js?v=note-stack-20260926"></script>
   <script src="/music-player.js?v=2"></script>
@@ -483,15 +484,18 @@
       renderAlbumCover();
     }
 
-    function setYear(year){
-      if(year!=='2026'&&year!=='2027')return;
+    function availableYears(){return view==='book'?['2026','2027']:[...new Set(['2026','2027',...library.map(PhotoMetadata.year)])].sort()}
+    function adjacentYear(direction=1){const years=availableYears();return years[wrap(years.indexOf(selectedYear)+direction,years.length)]}
+    function setYear(year,preservePage=false){
+      const years=availableYears();if(!years.includes(year))year=years[0];
+      const previousPage=bookPageIndex;
       stopBookTurn();
       const yearButton=$('#year'),changed=selectedYear!==year;
-      selectedYear=year;photos=library.filter(p=>p.year===year);position=target=0;active=-1;bookShown=-1;bookPageIndex=0;deriveBookPages();
+      selectedYear=year;photos=view==='book'?library.filter(p=>p.year===year):PhotoMetadata.sort(library.filter(p=>PhotoMetadata.year(p)===year));position=target=0;active=-1;bookShown=-1;bookPageIndex=preservePage?previousPage:0;deriveBookPages();
       yearButton.textContent=year;
-      yearButton.setAttribute('aria-label',`当前 ${year} 年，点击切换到 ${year==='2026'?'2027':'2026'} 年`);
-      const other=year==='2026'?'2027':'2026';
-      $('#prev-year').setAttribute('aria-label',`切换到 ${other} 年`);$('#next-year').setAttribute('aria-label',`切换到 ${other} 年`);
+      yearButton.setAttribute('aria-label',`当前 ${year} 年，点击切换到 ${adjacentYear()} 年`);
+      const other=adjacentYear();
+      $('#prev-year').setAttribute('aria-label',`切换到 ${adjacentYear(-1)} 年`);$('#next-year').setAttribute('aria-label',`切换到 ${other} 年`);
       document.querySelectorAll('.book-year').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.year===year)));
       if(changed&&!reduced.matches){yearButton.classList.remove('is-changing');void yearButton.offsetWidth;yearButton.classList.add('is-changing');setTimeout(()=>yearButton.classList.remove('is-changing'),380)}
       build();
@@ -541,7 +545,7 @@
             block.append(body,author);if(layout.noteArea)grid.append(block);else inlineNote=block;
           }
         }
-        foot.className='book-page-foot';title.textContent=firstPhoto?(firstPhoto.builtin?firstPhoto.title.replace(/\s*·\s*\d+$/,''):firstPhoto.title):'凡凡 & 涵涵';number.textContent=String(index+1).padStart(2,'0');foot.append(title,number);
+        foot.className='book-page-foot';title.textContent=firstPhoto?(firstPhoto.builtin?firstPhoto.title.replace(/^和宝宝的记忆\s*·\s*\d+$/,'和宝宝的记忆'):firstPhoto.title):'凡凡 & 涵涵';number.textContent=String(index+1).padStart(2,'0');foot.append(title,number);
         page.append(grid,...(inlineNote?[inlineNote]:[]),foot);
       }else{
         const cover=document.createElement('div'),heart=document.createElement('span'),names=document.createElement('strong'),line=document.createElement('small');
@@ -635,7 +639,7 @@
       const slotOpacity=photos.length<=slots?1:clamp((slots/2-Math.abs(d))/.75,0,1);
       return {x,y,z,s,rotY,rotZ,depth,opacity:slotOpacity*spatialOpacity};
     }
-    function showMoment(index){if(!photos.length)return;momentIndex=wrap(index,photos.length);const p=photos[momentIndex];$('#year-sub').textContent=p.demo?'DEMO · 示例照片':`${photos.length}张photo`;$('#photo-title').textContent=p.title;$('#photo-detail').textContent=p.demo?'点击右上角，导入你的照片':`${p.year} · ${p.path||'本地照片'}`;$('#counter').textContent=`${String(momentIndex+1).padStart(2,'0')} / ${String(photos.length).padStart(2,'0')}`;updateStoryNav(momentIndex)}
+    function showMoment(index){if(!photos.length)return;momentIndex=wrap(index,photos.length);const p=photos[momentIndex];$('#year-sub').textContent=p.demo?'DEMO · 示例照片':`${photos.length}张photo`;$('#photo-title').textContent=p.title;$('#photo-detail').textContent=p.demo?'点击右上角，导入你的照片':`${p.shotDate||PhotoMetadata.year(p)} · ${p.path||'本地照片'}`;$('#counter').textContent=`${String(momentIndex+1).padStart(2,'0')} / ${String(photos.length).padStart(2,'0')}`;updateStoryNav(momentIndex)}
     function loadVisibleCardImages(){
       const viewport=stage.getBoundingClientRect();
       cards.forEach((card,i)=>{
@@ -653,9 +657,9 @@
     function updateStoryNav(index){const count=photos.length;if(!count){$('#moment-prev-label').textContent='—';$('#moment-current-label').textContent='00';$('#moment-next-label').textContent='—';return}const label=i=>String(wrap(i,count)+1).padStart(2,'0');$('#moment-prev-label').textContent=label(index-1);$('#moment-current-label').textContent=label(index);$('#moment-next-label').textContent=label(index+1)}
     function animate(t){const ms=last?Math.min(t-last,50):16;last=t;if(render(false,ms))frame=requestAnimationFrame(animate);else{frame=0;last=0;if(Math.abs(position)>photos.length*10){const laps=Math.trunc(position/photos.length)*photos.length;position-=laps;target-=laps;}}}
     function wake(){if(!frame)frame=requestAnimationFrame(animate)}
-    function switchView(v){view=v;stage.dataset.view=v;document.body.classList.toggle('book-mode',v==='book');if(v!=='book'&&scrollY)scrollTo(0,0);bookReader.hidden=v!=='book';bookObject.hidden=!bookPages.length;$('#book-controls').hidden=!bookPages.length;empty.hidden=(v==='book'?bookPages.length:photos.length)>0;empty.querySelector('h2').textContent=v==='book'?'书本尚未排版':'让照片围成一圈';$('#empty-message').textContent=v==='book'&&!bookPages.length?'这个年份的书本还没有页面。':`这个年份暂时没有照片，请切换到 ${selectedYear==='2026'?'2027':'2026'} 年。`;list.setAttribute('aria-hidden',String(v==='book'));document.querySelectorAll('.views [data-view]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.view===v)));if(v==='book')showAlbumCover();else{clearTimeout(albumCoverTimer);albumCoverOpening=false;stopBookTurn();applyAlbumVisibility()}render(true);wake()}
+    function switchView(v){view=v;stage.dataset.view=v;setYear(selectedYear,true);document.body.classList.toggle('book-mode',v==='book');if(v!=='book'&&scrollY)scrollTo(0,0);bookReader.hidden=v!=='book';bookObject.hidden=!bookPages.length;$('#book-controls').hidden=!bookPages.length;empty.hidden=(v==='book'?bookPages.length:photos.length)>0;empty.querySelector('h2').textContent=v==='book'?'书本尚未排版':'让照片围成一圈';$('#empty-message').textContent=v==='book'&&!bookPages.length?'这个年份的书本还没有页面。':`这个年份暂时没有照片，请切换到 ${selectedYear==='2026'?'2027':'2026'} 年。`;list.setAttribute('aria-hidden',String(v==='book'));document.querySelectorAll('.views [data-view]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.view===v)));if(v==='book')showAlbumCover();else{clearTimeout(albumCoverTimer);albumCoverOpening=false;stopBookTurn();applyAlbumVisibility()}render(true);wake()}
     document.querySelectorAll('.views [data-view]').forEach(b=>b.addEventListener('click',()=>switchView(b.dataset.view)));
-    for(const id of ['year','prev-year','next-year'])$("#"+id).addEventListener('click',()=>setYear(selectedYear==='2026'?'2027':'2026'));
+    for(const id of ['year','prev-year','next-year'])$("#"+id).addEventListener('click',()=>setYear(adjacentYear(id==='prev-year'?-1:1)));
     document.querySelectorAll('.book-year').forEach(button=>button.addEventListener('click',()=>setYear(button.dataset.year)));
     $('#moment-prev').addEventListener('click',()=>{if(!photos.length)return;if(view==='book')showMoment(momentIndex-1);else{target=Math.round(target)-1;wake()}});
     $('#moment-next').addEventListener('click',()=>{if(!photos.length)return;if(view==='book')showMoment(momentIndex+1);else{target=Math.round(target)+1;wake()}});
@@ -671,7 +675,7 @@
     stage.addEventListener('pointermove',e=>{if(!drag||e.pointerId!==drag.id)return;target=drag.start-(e.clientX-drag.x)/(innerWidth<650?45:75)+(view==='gallery'?0:(e.clientY-drag.y)/90);wake()});
     function stop(e){if(!drag||e.pointerId!==drag.id)return;const moved=Math.hypot(e.clientX-down.x,e.clientY-down.y),clicked=drag.cardIndex;drag=null;stage.classList.remove('dragging');if(stage.hasPointerCapture(e.pointerId))stage.releasePointerCapture(e.pointerId);if(moved<6&&clicked>=0)openLightbox(clicked);}
     stage.addEventListener('pointerup',stop);stage.addEventListener('pointercancel',stop);
-    function showLightbox(i){if(!lightboxPool.length)return;openIndex=wrap(i,lightboxPool.length);const p=lightboxPool[openIndex],large=$('#large'),multiple=lightboxPool.length>1;large.src=p.src;large.alt=p.title;large.style.transform='';large.style.opacity='';$('#large-title').textContent=`${p.title} · ${p.year} · ${String(openIndex+1).padStart(2,'0')} / ${String(lightboxPool.length).padStart(2,'0')}`;$('#comment-open').hidden=!(p.builtin||p.published);$('#comment-open').textContent=`💬 ${commentCounts[p.key]||0}`;$('#lightbox-prev').hidden=!multiple;$('#lightbox-next').hidden=!multiple;for(const offset of [-1,1]){if(multiple){const preload=new Image();preload.src=lightboxPool[wrap(openIndex+offset,lightboxPool.length)].src}}}
+    function showLightbox(i){if(!lightboxPool.length)return;openIndex=wrap(i,lightboxPool.length);const p=lightboxPool[openIndex],large=$('#large'),multiple=lightboxPool.length>1;large.src=p.src;large.alt=p.title;large.style.transform='';large.style.opacity='';$('#large-title').textContent=`${p.title} · ${p.shotDate||PhotoMetadata.year(p)} · ${String(openIndex+1).padStart(2,'0')} / ${String(lightboxPool.length).padStart(2,'0')}`;$('#comment-open').hidden=!(p.builtin||p.published);$('#comment-open').textContent=`💬 ${commentCounts[p.key]||0}`;$('#lightbox-prev').hidden=!multiple;$('#lightbox-next').hidden=!multiple;for(const offset of [-1,1]){if(multiple){const preload=new Image();preload.src=lightboxPool[wrap(openIndex+offset,lightboxPool.length)].src}}}
     function openLightbox(i){lightboxPool=view==='book'?bookPhotoList:photos;if(i<0||!lightboxPool[i])return;clearTimeout(lightboxCloseTimer);showLightbox(i);$('#lightbox').classList.add('open');$('#lightbox').setAttribute('aria-hidden','false');document.body.classList.add('lightbox-open');$('#close').focus()}
     function stepLightbox(direction){if(openIndex<0||lightboxPool.length<2)return;const next=wrap(openIndex+direction,lightboxPool.length);if(!reduced.matches&&large.animate)large.animate([{opacity:.45,transform:`translateX(${direction>0?'-12px':'12px'}) scale(.99)`},{opacity:1,transform:'translateX(0) scale(1)'}],{duration:300,easing:'cubic-bezier(.22,.61,.36,1)'});showLightbox(next)}
     function closeLightbox(){if(openIndex<0)return;openIndex=-1;lightboxDrag=null;const large=$('#large'),box=$('#lightbox');large.style.transform='';large.style.opacity='';box.classList.remove('open');box.setAttribute('aria-hidden','true');document.body.classList.remove('lightbox-open');clearTimeout(lightboxCloseTimer);lightboxCloseTimer=setTimeout(()=>{if(!box.classList.contains('open'))large.removeAttribute('src')},360);stage.focus()}
@@ -736,11 +740,15 @@
         const data=await response.json();
         const hidden=new Set(Array.isArray(data.hiddenSeedIds)?data.hiddenSeedIds:[]);
         commentCounts=data.commentCounts||{};
-        const online=(Array.isArray(data.photos)?data.photos:[]).filter(p=>p.year==='2026'||p.year==='2027').map(p=>({title:p.title||'新的照片',year:p.year,src:p.src,thumb:p.thumbnailSrc||p.src,path:'线上照片',key:p.id,builtin:false,published:true}));
-        library=[...seedPhotos.filter(p=>!hidden.has(p.key)),...online];
+        const online=(Array.isArray(data.photos)?data.photos:[]).map(p=>({title:p.title||'新的照片',year:p.year,shotDate:p.shotDate||null,src:p.src,thumb:p.thumbnailSrc||p.src,path:'线上照片',key:p.id,builtin:false,published:true}));
+        const seedMetadata=new Map((data.seedPhotos||[]).map(p=>[p.id,p]));
+        library=[...seedPhotos.filter(p=>!hidden.has(p.key)).map(p=>({...p,...seedMetadata.get(p.key),thumb:seedMetadata.get(p.key)?.thumbnailSrc||p.thumb})),...online];
         loading=false;
         loadError=false;
-        setYear(selectedYear);
+        const openPhotoId=openIndex>=0?lightboxPool[openIndex]?.key:null;
+        setYear(selectedYear,true);
+        if(openPhotoId){lightboxPool=view==='book'?bookPhotoList:photos;const index=lightboxPool.findIndex(p=>p.key===openPhotoId);if(index>=0)showLightbox(index);else closeLightbox()}
+        if(commentPhotoId){const current=library.find(p=>p.key===commentPhotoId);if(current)$('#comment-photo-title').textContent=current.title}
       }catch{loading=false;loadError=true;setYear(selectedYear);showStatus('在线照片暂时无法加载，请稍后刷新页面')}
     }
     async function loadBookLayout(){
@@ -751,12 +759,13 @@
         bookLayoutConfigured=Boolean(data.configured);
         bookLayoutYears=data.years||{'2026':[],'2027':[]};
         featuredComments=data.featuredComments||{};
-        setYear(selectedYear);
+        setYear(selectedYear,true);
       }catch{bookLayoutConfigured=false;deriveBookPages();if(view==='book')build()}
     }
     const previewYear=new URLSearchParams(location.search).get('bookYear');
     window.addEventListener('resize',()=>{stopBookTurn();render(true)});reduced.addEventListener('change',()=>{if(reduced.matches)stopBookTurn();render(true)});setYear(previewYear==='2027'?'2027':'2026');Promise.all([loadPublishedPhotos(),loadBookLayout(),loadAlbumCover()]);
     document.addEventListener('visibilitychange',()=>{if(!document.hidden){loadPublishedPhotos();loadBookLayout()}});
+    window.addEventListener('storage',event=>{if(event.key==='photoRingMetadataUpdated'){loadPublishedPhotos();loadAlbumCover()}});
   })();
   </script>
 </body>

@@ -9,7 +9,7 @@ import secrets
 import threading
 import time
 import uuid
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from io import BytesIO
 from pathlib import Path
 
@@ -307,6 +307,11 @@ def book_cover_script():
     return send_from_directory(PUBLIC_DIR, "book-cover.js")
 
 
+@app.get("/photo-metadata.js")
+def photo_metadata_script():
+    return send_from_directory(PUBLIC_DIR, "photo-metadata.js")
+
+
 @app.get("/book-cover.css")
 def book_cover_style():
     return send_from_directory(PUBLIC_DIR, "book-cover.css")
@@ -374,11 +379,13 @@ def photos():
         if comment.get("status") == "approved" and comment.get("photoId") in active_ids:
             photo_id = comment.get("photoId")
             counts[photo_id] = counts.get(photo_id, 0) + 1
-    public_fields = {"id", "title", "year", "src", "thumbnailSrc", "uploaded", "width", "height"}
+    public_fields = {"id", "title", "year", "shotDate", "src", "thumbnailSrc", "uploaded", "width", "height"}
     return jsonify({
         "photos": [{**{key: value for key, value in item.items() if key in public_fields},
                     "commentCount": counts.get(item["id"], 0)} for item in data["photos"] if item["id"] in active_ids],
         "hiddenSeedIds": sorted(SEED_IDS - active_ids),
+        "seedPhotos": [{key: value for key, value in item.items() if key in public_fields}
+                       for item in all_photo_records(data) if item["id"] in SEED_IDS & active_ids],
         "commentCounts": counts,
     })
 
@@ -900,9 +907,52 @@ def manage_photos():
     data = read_data()
     items = all_photo_records(data)
     include_trash = request.args.get("includeTrash") == "1"
-    fields = {"id", "title", "year", "src", "thumbnailSrc", "builtin", "uploaded", "deletedAt", "purgeStartedAt"}
+    fields = {"id", "title", "year", "shotDate", "src", "thumbnailSrc", "builtin", "uploaded", "deletedAt", "purgeStartedAt"}
     return jsonify({"photos": [{key: value for key, value in item.items() if key in fields}
                                for item in items if include_trash or not item.get("deletedAt")]})
+
+
+@app.patch("/api/manage/photos/<photo_id>")
+@admin_required
+def update_photo_metadata(photo_id: str):
+    # The existing lifecycle request lock serializes edits with trash/restore/purge.
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict) or not payload or set(payload) - {"title", "shotDate"}:
+        return jsonify({"error": "只能修改照片名称和拍摄日期"}), 400
+    updates = {}
+    if "title" in payload:
+        title = payload["title"]
+        if not isinstance(title, str) or not 1 <= len(title.strip()) <= 60:
+            return jsonify({"error": "照片名称需为 1–60 个字符"}), 400
+        updates["title"] = title.strip()
+    if "shotDate" in payload:
+        shot_date = payload["shotDate"]
+        if shot_date is None or shot_date == "":
+            updates["shotDate"] = None
+        else:
+            if not isinstance(shot_date, str) or not re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}", shot_date):
+                return jsonify({"error": "拍摄日期需为有效的 YYYY-MM-DD 日期"}), 400
+            try:
+                date.fromisoformat(shot_date)
+            except ValueError:
+                return jsonify({"error": "拍摄日期需为有效的 YYYY-MM-DD 日期"}), 400
+            updates["shotDate"] = shot_date
+    data = read_data()
+    photo = photo_record(data, photo_id)
+    if not photo:
+        return jsonify({"error": "照片不存在"}), 404
+    if photo.get("deletedAt") or photo.get("purgeStartedAt"):
+        return jsonify({"error": "请先从回收站恢复照片，再编辑信息"}), 409
+    target = data["seedStates"].setdefault(photo_id, {}) if photo_id in SEED_IDS else next(
+        item for item in data["photos"] if item["id"] == photo_id)
+    target.update(updates)
+    try:
+        write_data(data)
+    except OSError:
+        app.logger.error("Photo metadata save failed photoId=%s", photo_id)
+        return jsonify({"error": "照片信息未能保存，请稍后重试"}), 503
+    return jsonify({"ok": True, "photo": {key: value for key, value in {**photo, **updates}.items()
+                     if key in {"id", "title", "year", "shotDate", "uploaded"}}})
 
 
 def save_image(file_storage) -> tuple[str, str]:
