@@ -108,6 +108,29 @@ class AnalyticsTest(unittest.TestCase):
         self.assertEqual(len(self.store.recent(2)['items']),3)
         self.assertEqual(self.store.recent(3)['items'],[])
 
+    def test_shared_proxy_peer_does_not_stop_at_6000(self):
+        self.record()
+        with self.store.connection(write=True) as con:
+            con.execute("UPDATE limits SET count=6000 WHERE kind='peer'")
+        self.assertEqual(self.record(visitor=str(uuid.uuid4())), 'recorded')
+        self.assertEqual(self.store.summary(7)['cards']['todayPv'],2)
+
+    def test_dashboard_collection_cap_and_denied_counts(self):
+        self.record()
+        with self.store.connection(write=True) as con:
+            con.execute("UPDATE limits SET count=120 WHERE kind='visitor'")
+        self.assertEqual(self.record(),'limited')
+        result=self.store.summary(7)['collection']
+        self.assertFalse(result['reached']);self.assertEqual(result['blocked'],{'visitor':1})
+        with self.store.connection(write=True) as con:
+            con.execute("UPDATE limits SET count=10000 WHERE kind='global'")
+        self.assertEqual(self.record(visitor=str(uuid.uuid4())),'limited')
+        self.store.cleanup()
+        result=self.store.summary(7)['collection']
+        self.assertTrue(result['reached']);self.assertEqual(result['accepted'],10000)
+        self.assertEqual(result['blockedTotal'],2)
+        self.assertEqual(result['blocked'],{'visitor':1,'global':1})
+
     def test_backup_wal_snapshot_and_exclusive_target(self):
         self.record();target=self.root/'backups'/'snapshot.sqlite3'
         # Keep a reader open, so WAL state remains relevant during the backup.

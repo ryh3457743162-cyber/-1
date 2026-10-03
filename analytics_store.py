@@ -105,7 +105,7 @@ class AnalyticsStore:
         con.execute('DELETE FROM visitors WHERE day < ?', ((civil-timedelta(days=1)).isoformat(),))
         for table in ('daily', 'dimensions', 'errors'):
             con.execute(f'DELETE FROM {table} WHERE day < ?', (summary_cutoff,))
-        con.execute("DELETE FROM limits WHERE (kind!='global' AND bucket < ?) OR (kind='global' AND bucket < ?)",
+        con.execute("DELETE FROM limits WHERE (kind NOT IN ('global','blocked') AND bucket < ?) OR (kind IN ('global','blocked') AND bucket < ?)",
                     ((now-timedelta(hours=2)).strftime('%Y-%m-%dT%H'),day+'T00'))
         con.execute("INSERT INTO maintenance VALUES('cleanup',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value", (day,))
 
@@ -118,11 +118,14 @@ class AnalyticsStore:
             if con.execute('SELECT 1 FROM visits WHERE day=? AND event=?', (day,event)).fetchone():
                 return 'duplicate'
             # One daily global cap bounds storage to <=300,000 raw rows / 30 days.
-            buckets = [(hour,'visitor',visitor,120), (hour,'peer',self.digest('peer',day,peer),6000),
-                       (day+'T00','global','all',10000)]
+            # A loopback nginx peer is shared by every visitor. Its hourly budget
+            # must not impose a lower aggregate ceiling than the daily global cap.
+            buckets = [(day+'T00','global','all',10000), (hour,'visitor',visitor,120),
+                       (hour,'peer',self.digest('peer',day,peer),10000)]
             for bucket, kind, key, cap in buckets:
                 row = con.execute('SELECT count FROM limits WHERE bucket=? AND kind=? AND key=?', (bucket,kind,key)).fetchone()
                 if row and row[0] >= cap:
+                    con.execute("INSERT INTO limits VALUES(?,'blocked',?,1) ON CONFLICT(bucket,kind,key) DO UPDATE SET count=count+1", (day+'T00',kind))
                     return 'limited'
             for bucket, kind, key, _ in buckets:
                 con.execute('INSERT INTO limits VALUES(?,?,?,1) ON CONFLICT(bucket,kind,key) DO UPDATE SET count=count+1', (bucket,kind,key))
@@ -150,6 +153,11 @@ class AnalyticsStore:
             current = rows.get(today.isoformat(), {'pv':0,'uv':0})
             recent7 = con.execute('SELECT COALESCE(SUM(pv),0) FROM daily WHERE day BETWEEN ? AND ?', (seven,today.isoformat())).fetchone()[0]
             errors_today = con.execute('SELECT COALESCE(SUM(count),0) FROM errors WHERE day=?', (today.isoformat(),)).fetchone()[0]
+            accepted = con.execute("SELECT count FROM limits WHERE bucket=? AND kind='global' AND key='all'", (today.isoformat()+'T00',)).fetchone()
+            blocked = {r['key']:r['count'] for r in con.execute("SELECT key,count FROM limits WHERE bucket=? AND kind='blocked'", (today.isoformat()+'T00',))}
+            cap = {'dailyLimit':10000, 'accepted':accepted[0] if accepted else 0,
+                   'reached':bool(accepted and accepted[0]>=10000), 'blocked':blocked,
+                   'blockedTotal':sum(blocked.values())}
             dimensions = {}
             for kind in ('page','device','browser','os'):
                 dimensions[kind] = [{'label':r['label'],'count':r['count']} for r in con.execute(
@@ -161,7 +169,7 @@ class AnalyticsStore:
                 trend.append({'day':day,'pv':rows.get(day,{}).get('pv',0),'uv':rows.get(day,{}).get('uv',0)})
             return {'today':today.isoformat(),'timezone':'Asia/Shanghai','days':days,
                     'cards':{'todayPv':current['pv'],'todayUv':current['uv'],'last7Pv':recent7,'todayErrors':errors_today},
-                    'trend':trend,'dimensions':dimensions,'errors':errors,'pages':PAGES}
+                    'trend':trend,'dimensions':dimensions,'errors':errors,'pages':PAGES,'collection':cap}
 
     def recent(self, page):
         cutoff = (self.clock().astimezone(SHANGHAI).date()-timedelta(days=29)).isoformat()

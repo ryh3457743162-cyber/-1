@@ -44,6 +44,10 @@
     const c=data.cards;
     for(const [id,value] of [['today-pv',c.todayPv],['today-uv',c.todayUv],['last7-pv',c.last7Pv],['today-errors',c.todayErrors]])$(id).textContent=fmt(value);
     $('period').textContent=`${data.today} · 北京时间（Asia/Shanghai）`;
+    const limit=data.collection;
+    $('collection-status').textContent=limit.reached
+      ? `今日采集已达到 ${fmt(limit.dailyLimit)} 次上限，后续访问暂不计入；网站功能仍正常。今日限流拒收 ${fmt(limit.blockedTotal)} 次。`
+      : `今日采集 ${fmt(limit.accepted)} / ${fmt(limit.dailyLimit)} 次${limit.blockedTotal ? ` · 限流拒收 ${fmt(limit.blockedTotal)} 次（访客过频 ${fmt(limit.blocked.visitor||0)}、来源过频 ${fmt(limit.blocked.peer||0)}、每日上限 ${fmt(limit.blocked.global||0)}）` : ''}。`;
     chart();distribution('page-rank',data.dimensions.page,data.pages);distribution('device-rank',data.dimensions.device);
     distribution('browser-rank',data.dimensions.browser);distribution('os-rank',data.dimensions.os);
     $('errors').replaceChildren();
